@@ -1,16 +1,86 @@
 #!/usr/bin/env python
 """
-Hello World, but with more meat.
+DR2 logger with wxPython GUI
 """
 
 import wx
 import serial
 
+import os
+import sys
+import threading
+import queue
+
+log_raw_data = False
+debugging = False
+
+version_string = '(Version 2.0.0, 2022-01-16)'
+# TODO: update date
+
+ID_STARTLOG = 100
+
+# Global variables
+logger_stared = False
+
+intro_text = '''
+Dirt Rally 2.0 Logger {}
+https://github.com/ErlerPhilipp/dr2_logger
+
+Make sure, UDP data is enabled in the hardware_settings_config.xml 
+Default: C:\\Users\\ [username] \\Documents\\My Games\\DiRT Rally 2.0\\hardwaresettings\\hardware_settings_config.xml
+<motion_platform>
+    <dbox enabled="false" />
+    <udp enabled="true" extradata="3" ip="127.0.0.1" port="20777" delay="1" />
+    <custom_udp enabled="False" filename="packet_data.xml" ip="127.0.0.1" port="20777" delay="1" />
+    <fanatec enabled="false" pedalVibrationScale="1.0" wheelVibrationScale="1.0" ledTrueForGearsFalseForSpeed="true" />
+</motion_platform>
+'''.format(version_string)
+
+commands_hint = '''
+Enter:
+"e" or "exit" to exit the program
+"c" or "clear" to clear the current run
+"p" or "plot" to show the important plots
+"pa" or "plot_all" to show all plots
+"s" or "save" to save the current run
+"l" or "load" to load a saved run
+"g game_name" to switch the target game, values for game_name: {}
+'''
+# '''.format(LoggerBackend.get_all_valid_games())
+
+def add_input(message_queue):
+    global logger_stared
+    # running = True
+    print("add_input thread")
+    # while running:
+    while logger_stared:
+        read_res = input()
+        message_queue.put(read_res)
+        if read_res == 'e':
+            logger_stared = False
+
+def thread_dr2logger_init(print_function):
+
+    end_program = False
+
+    # print(intro_text)
+    # print(commands_hint)
+    print_function(intro_text)
+
+    # logger_backend = LoggerBackend(debugging=debugging, log_raw_data=log_raw_data)
+    # logger_backend.start_logging()
+
+    message_queue = queue.Queue()
+    input_thread = threading.Thread(target=add_input, args=(message_queue,))
+    input_thread.daemon = True
+    input_thread.start()
+    
+
 class MainFrame(wx.Frame):
     """
-    A Frame that says Hello World
+    Main program frame
     """
-
+    
     def __init__(self, *args, **kw):
         # ensure the parent's __init__ is called
         # super(MainFrame, self).__init__(*args, **kw, size=(1000, 800))
@@ -57,9 +127,11 @@ class MainFrame(wx.Frame):
         topSizer.Add(toprightSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
         
         # Bottom sizer : console output
-        consoleTextCtrl   = wx.TextCtrl(pnl, size=wx.Size(600, 600), style=wx.TE_MULTILINE|wx.TE_READONLY)
+        self.button_loggerStart  = wx.Button(pnl, label="Start logging", size=wx.Size(100, 30), style = wx.ALIGN_LEFT)
+        self.consoleTextCtrl   = wx.TextCtrl(pnl, size=wx.Size(600, 600), style=wx.TE_MULTILINE|wx.TE_READONLY)
         
-        bottomSizer.Add(consoleTextCtrl, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        bottomSizer.Add(self.button_loggerStart, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        bottomSizer.Add(self.consoleTextCtrl, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         
         # Main frame sizer
         sizer.Add(topSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
@@ -77,13 +149,10 @@ class MainFrame(wx.Frame):
         # pnl.SetSize((1000, 800))
         sizer.Fit(self)
         
-        # self.Update()
-        # self.Layout()
-        # self.Refresh()
-        # self.Center()
         self.Show()
-        # self.Layout()
-        # self.Update()
+        
+        # Bind start logging button
+        self.Bind(wx.EVT_BUTTON, self.OnClickStartLogging, self.button_loggerStart)
 
     def makeMenuBar(self):
         """
@@ -142,6 +211,20 @@ class MainFrame(wx.Frame):
                       "About DR2 logger WX",
                       wx.OK|wx.ICON_INFORMATION)
 
+    def OnClickStartLogging(self, event):
+        # Start / Stop DR2logger process
+        global logger_stared
+        if logger_stared==False:
+            logger_stared=True
+            self.button_loggerStart.SetLabel("Stop logging")
+            thread_dr2logger_init(self.print_log)
+        else:
+            logger_stared=False
+            self.button_loggerStart.SetLabel("Start logging")
+    
+    def print_log(self, text):
+        self.consoleTextCtrl.AppendText(text)
+
 
 if __name__ == '__main__':
     # When this module is run (not imported) then create the app, the
@@ -153,4 +236,7 @@ if __name__ == '__main__':
     frm.SetIcon(wx.Icon("randagodron_icon_16x16.png"))
     
     frm.Show()
+    
+    # thread_dr2logger_init()
+    
     app.MainLoop()
