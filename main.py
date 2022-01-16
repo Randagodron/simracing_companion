@@ -11,6 +11,8 @@ import sys
 import threading
 import queue
 
+from source.logger_backend import LoggerBackend
+
 log_raw_data = False
 debugging = False
 
@@ -100,14 +102,15 @@ class MainFrame(wx.Frame):
         bottomSizer       = wx.BoxSizer(wx.VERTICAL)
         topleftSizer      = wx.BoxSizer(wx.VERTICAL)
         toprightSizer     = wx.BoxSizer(wx.VERTICAL)
+        middleSizer       = wx.BoxSizer(wx.HORIZONTAL)
         sizer             = wx.BoxSizer(wx.VERTICAL)
         
         # Top left sizer : serial config
         buttonRefresh     = wx.Button(pnl, label="Refresh", size=wx.Size(100, 32))
         buttonConnect     = wx.Button(pnl, label="Connect", size=wx.Size(100, 32))
-        serialList        = wx.Choice(pnl, choices=["COMx", "COMy", "COMz"])
+        listSerialPorts   = wx.Choice(pnl, choices=["COMx", "COMy", "COMz"])
         
-        topleftSizer.Add(serialList, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        topleftSizer.Add(listSerialPorts, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         topleftSizer.Add(buttonRefresh, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         topleftSizer.Add(buttonConnect, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         
@@ -126,6 +129,21 @@ class MainFrame(wx.Frame):
         topSizer.Add(topleftSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
         topSizer.Add(toprightSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
         
+        # Middle sizer : logger controls
+        self.listGame        = wx.Choice(pnl, choices=["DiRT 1", "DiRT 2.0", "Richard Burns Rally"])
+        self.buttonClearRun  = wx.Button(pnl, label="Clear run", size=wx.Size(100, 32))
+        self.buttonPlot      = wx.Button(pnl, label="Plot", size=wx.Size(100, 32))
+        self.buttonPlotAll   = wx.Button(pnl, label="PlotAll", size=wx.Size(100, 32))
+        self.buttonSave      = wx.Button(pnl, label="Save", size=wx.Size(100, 32))
+        self.buttonLoad      = wx.Button(pnl, label="Load", size=wx.Size(100, 32))
+        
+        middleSizer.Add(self.listGame, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        middleSizer.Add(self.buttonClearRun, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        middleSizer.Add(self.buttonPlot, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        middleSizer.Add(self.buttonPlotAll, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        middleSizer.Add(self.buttonSave, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        middleSizer.Add(self.buttonLoad, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        
         # Bottom sizer : console output
         self.button_loggerStart  = wx.Button(pnl, label="Start logging", size=wx.Size(100, 30), style = wx.ALIGN_LEFT)
         self.consoleTextCtrl   = wx.TextCtrl(pnl, size=wx.Size(600, 600), style=wx.TE_MULTILINE|wx.TE_READONLY)
@@ -135,6 +153,7 @@ class MainFrame(wx.Frame):
         
         # Main frame sizer
         sizer.Add(topSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
+        sizer.Add(middleSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
         sizer.Add(bottomSizer, 2, wx.ALL|wx.EXPAND|wx.CENTER)
         
         # create a menu bar
@@ -233,7 +252,7 @@ if __name__ == '__main__':
     frm = MainFrame(None, title='DR2 logger WX')
     
     # Set custom icon
-    frm.SetIcon(wx.Icon("randagodron_icon_16x16.png"))
+    frm.SetIcon(wx.Icon("assets/randagodron_icon_16x16.png"))
     
     frm.Show()
     
