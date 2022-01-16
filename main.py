@@ -106,13 +106,13 @@ class MainFrame(wx.Frame):
         sizer             = wx.BoxSizer(wx.VERTICAL)
         
         # Top left sizer : serial config
-        buttonRefresh     = wx.Button(pnl, label="Refresh", size=wx.Size(100, 32))
-        buttonConnect     = wx.Button(pnl, label="Connect", size=wx.Size(100, 32))
-        listSerialPorts   = wx.Choice(pnl, choices=["COMx", "COMy", "COMz"])
+        self.buttonRefresh     = wx.Button(pnl, label="Refresh", size=wx.Size(100, 32))
+        self.buttonConnect     = wx.Button(pnl, label="Connect", size=wx.Size(100, 32))
+        self.listSerialPorts   = wx.Choice(pnl, choices=["COMx", "COMy", "COMz"])
         
-        topleftSizer.Add(listSerialPorts, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        topleftSizer.Add(buttonRefresh, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        topleftSizer.Add(buttonConnect, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        topleftSizer.Add(self.listSerialPorts, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        topleftSizer.Add(self.buttonRefresh, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        topleftSizer.Add(self.buttonConnect, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         
         # Top right sizer : application parameters
         button1     = wx.Button(pnl, label="1", size=wx.Size(100, 30), style = wx.ALIGN_LEFT)
@@ -153,7 +153,9 @@ class MainFrame(wx.Frame):
         
         # Main frame sizer
         sizer.Add(topSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
+        sizer.Add(wx.StaticLine(pnl,), 0, wx.ALL|wx.EXPAND, 5)
         sizer.Add(middleSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
+        sizer.Add(wx.StaticLine(pnl,), 0, wx.ALL|wx.EXPAND, 5)
         sizer.Add(bottomSizer, 2, wx.ALL|wx.EXPAND|wx.CENTER)
         
         # create a menu bar
@@ -172,6 +174,13 @@ class MainFrame(wx.Frame):
         
         # Bind start logging button
         self.Bind(wx.EVT_BUTTON, self.OnClickStartLogging, self.button_loggerStart)
+        self.Bind(wx.EVT_BUTTON, self.OnClickClearRun, self.buttonClearRun)
+        self.Bind(wx.EVT_BUTTON, self.OnClickPlot, self.buttonPlot)
+        self.Bind(wx.EVT_BUTTON, self.OnClickPlotAll, self.buttonPlotAll)
+        self.Bind(wx.EVT_BUTTON, self.OnClickSave, self.buttonSave)
+        self.Bind(wx.EVT_BUTTON, self.OnClickLoad, self.buttonLoad)
+        self.Bind(wx.EVT_CHOICE, self.OnSelectGame, self.listGame)
+        self.Bind(wx.EVT_CHOICE, self.OnSelectSerial, self.listSerialPorts)
 
     def makeMenuBar(self):
         """
@@ -243,6 +252,27 @@ class MainFrame(wx.Frame):
     
     def print_log(self, text):
         self.consoleTextCtrl.AppendText(text)
+        
+    def OnClickClearRun(self, event):
+        self.consoleTextCtrl.AppendText("Clear run\n") # DEBUG
+    
+    def OnClickPlot(self, event):
+        self.consoleTextCtrl.AppendText("Plot relevant data\n") # DEBUG
+        
+    def OnClickPlotAll(self, event):
+        self.consoleTextCtrl.AppendText("Plot all data\n") # DEBUG
+    
+    def OnClickSave(self, event):
+        self.consoleTextCtrl.AppendText("Save run\n") # DEBUG
+    
+    def OnClickLoad(self, event):
+        self.consoleTextCtrl.AppendText("Load run\n") # DEBUG
+    
+    def OnSelectGame(self, event):
+        self.consoleTextCtrl.AppendText("Game selected : %d\n" % self.listGame.GetCurrentSelection()) # DEBUG
+    
+    def OnSelectSerial(self, event):
+        self.consoleTextCtrl.AppendText("Serial port selected : %d\n" % self.listSerialPorts.GetCurrentSelection()) # DEBUG
 
 
 if __name__ == '__main__':
