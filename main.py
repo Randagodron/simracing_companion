@@ -24,6 +24,8 @@ ID_STARTLOG = 100
 # Global variables
 logger_stared = False
 
+logger_backend = LoggerBackend(debugging=debugging, log_raw_data=log_raw_data)
+
 intro_text = '''
 Dirt Rally 2.0 Logger {}
 https://github.com/ErlerPhilipp/dr2_logger
@@ -47,36 +49,51 @@ Enter:
 "s" or "save" to save the current run
 "l" or "load" to load a saved run
 "g game_name" to switch the target game, values for game_name: {}
-'''
-# '''.format(LoggerBackend.get_all_valid_games())
+'''.format(LoggerBackend.get_all_valid_games())
 
-def add_input(message_queue):
-    global logger_stared
-    # running = True
-    print("add_input thread")
-    # while running:
+def udp_listen(print_function):
+    global logger_backend
+    
     while logger_stared:
-        read_res = input()
-        message_queue.put(read_res)
-        if read_res == 'e':
-            logger_stared = False
+        logger_backend.check_udp_messages()
+        print_current_state(logger_backend.get_game_state_str())
+        
+        message = logger_backend.check_state_changes()
+        if len(message) > 0:
+            print_function(message)
 
 def thread_dr2logger_init(print_function):
-
+    global logger_backend
+    
     end_program = False
 
-    # print(intro_text)
-    # print(commands_hint)
+    # print_function(commands_hint)
     print_function(intro_text)
 
     # logger_backend = LoggerBackend(debugging=debugging, log_raw_data=log_raw_data)
-    # logger_backend.start_logging()
-
-    message_queue = queue.Queue()
-    input_thread = threading.Thread(target=add_input, args=(message_queue,))
-    input_thread.daemon = True
-    input_thread.start()
+    logger_backend.start_logging()
     
+def print_current_state(state_str):
+    if state_str is not None:
+        try:
+            if os.name == 'nt':
+                import ctypes
+                ctypes.windll.kernel32.SetConsoleTitleW(state_str)
+            else:
+                # for Linux terminals:
+                # while both Gnome Terminal and KDE's Konsole report TERM=xterm-256color,
+                # Konsole needs different control chars
+                # to change the terminal title
+                if 'KONSOLE_VERSION' in os.environ:
+                    # https://stackoverflow.com/questions/19897787/change-konsole-tab-title-from-command-line-and-make-it-persistent
+                    # TODO this works only once per stage where it's updated at the very beginning
+                    sys.stdout.write('\033]30;{}\007'.format(state_str))
+                else:
+                    # https://stackoverflow.com/questions/25872409/set-gnome-terminal-window-title-in-python/47262154#47262154
+                    sys.stdout.write('\33]0;{}\a'.format(state_str))
+                sys.stdout.flush()
+        finally:
+            pass
 
 class MainFrame(wx.Frame):
     """
@@ -181,6 +198,8 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.OnClickLoad, self.buttonLoad)
         self.Bind(wx.EVT_CHOICE, self.OnSelectGame, self.listGame)
         self.Bind(wx.EVT_CHOICE, self.OnSelectSerial, self.listSerialPorts)
+        
+        self.thread_udp = threading.Thread(target=udp_listen(self.print_log))
 
     def makeMenuBar(self):
         """
@@ -240,36 +259,63 @@ class MainFrame(wx.Frame):
                       wx.OK|wx.ICON_INFORMATION)
 
     def OnClickStartLogging(self, event):
+        global logger_backend
         # Start / Stop DR2logger process
         global logger_stared
         if logger_stared==False:
             logger_stared=True
             self.button_loggerStart.SetLabel("Stop logging")
             thread_dr2logger_init(self.print_log)
+            self.thread_udp.daemon = True
+            self.thread_udp.start()
         else:
             logger_stared=False
             self.button_loggerStart.SetLabel("Start logging")
+            self.thread_udp.join()
+            logger_backend.end_logging()
     
     def print_log(self, text):
         self.consoleTextCtrl.AppendText(text)
         
     def OnClickClearRun(self, event):
+        global logger_backend
+        logger_backend.clear_session_collection()
         self.consoleTextCtrl.AppendText("Clear run\n") # DEBUG
     
     def OnClickPlot(self, event):
+        global logger_backend
         self.consoleTextCtrl.AppendText("Plot relevant data\n") # DEBUG
+        if logger_backend.get_num_samples() == 0:
+            self.consoleTextCtrl.AppendText('No data points to plot\n')
+        else:
+            self.consoleTextCtrl.AppendText('Plotting {} data points\n'.format(logger_backend.get_num_samples()))
+            logger_backend.show_plots(True)
         
     def OnClickPlotAll(self, event):
+        global logger_backend
         self.consoleTextCtrl.AppendText("Plot all data\n") # DEBUG
+        logger_backend.save_run()
     
     def OnClickSave(self, event):
+        global logger_backend
         self.consoleTextCtrl.AppendText("Save run\n") # DEBUG
+        logger_backend.save_run()
     
     def OnClickLoad(self, event):
+        global logger_backend
         self.consoleTextCtrl.AppendText("Load run\n") # DEBUG
+        logger_backend.load_run()
+        print_current_state(logger_backend.get_game_state_str())
     
     def OnSelectGame(self, event):
+        global logger_backend
         self.consoleTextCtrl.AppendText("Game selected : %d\n" % self.listGame.GetCurrentSelection()) # DEBUG
+        if self.listGame.GetCurrentSelection() < len(LoggerBackend.get_all_valid_games()):
+            new_game_name = LoggerBackend.get_all_valid_games()[self.listGame.GetCurrentSelection()]
+            logger_backend.change_game(new_game_name)
+            self.consoleTextCtrl.AppendText('Switched game to "{}"\n'.format(logger_backend.game_name))
+        else:
+            self.consoleTextCtrl.AppendText('Incorrect game index\n')
     
     def OnSelectSerial(self, event):
         self.consoleTextCtrl.AppendText("Serial port selected : %d\n" % self.listSerialPorts.GetCurrentSelection()) # DEBUG
