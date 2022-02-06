@@ -5,6 +5,8 @@ Following : https://wiki.wxpython.org/wxPython%20Style%20Guide
 """
 
 import wx
+from pubsub import pub
+
 import serial
 from serial.tools import list_ports
 
@@ -98,7 +100,7 @@ def print_current_state(state_str):
             pass
 
 
-class PanelSerial(wx.Panel):
+class PanelSerial(wx.Panel, object):
     """Main panel"""
     def __init__(self, parent, *args, **kwargs):
         """Create the PanelSerial."""
@@ -115,7 +117,8 @@ class PanelSerial(wx.Panel):
         # Scan for COM ports
         self.scan_com_ports(ports, ports_list, ports_description_list)
         
-        print(ports_description_list)
+        # print(ports_description_list) # DEBUG
+        # pub.sendMessage("print_console", message=', '.join(ports_description_list)) # DEBUG
         
         buttonRefresh     = wx.Button(self, label="Refresh", size=wx.Size(100, 32))
         buttonRefresh.Bind(wx.EVT_BUTTON, self.OnClickPortsRefresh)
@@ -134,37 +137,51 @@ class PanelSerial(wx.Panel):
         self.SetSizer(sizer)
         self.Layout()
         
+        msg = "test"
+        
+    
     def OnClickPortsRefresh(self, event):
         # self.scan_com_ports()
-        # print("Refresh\n")
+        # print("Refresh\n") # DEBUG
+        # pub.sendMessage("print_console", message="Refresh") # DEBUG
         pass
         
+    
     def getOnClickPortsConnect(self, ports_list, port_current_selection):
         def OnClickPortsConnect(event):
+            # pub.sendMessage("print_console", message="Ports connect") # DEBUG
             ser = serial.Serial(ports_list[port_current_selection], 115200)
-            print(ser.name)
+            # print(ser.name) # DEBUG
+            pub.sendMessage("print_console", message=ser.name)
         return OnClickPortsConnect
         
+    
     """https://stackoverflow.com/questions/173687/is-it-possible-to-pass-arguments-into-event-bindings"""
     def getOnSelectSerial(self, list_serial_ports):
         def OnSelectSerial(event):
-            print("Serial port selected : %d\n" % list_serial_ports.GetCurrentSelection())
+            # pub.sendMessage("print_console", message="Port selected") # DEBUG
+            # print("Serial port selected : %d\n" % list_serial_ports.GetCurrentSelection()) # DEBUG
+            pub.sendMessage("print_console", message="Serial port selected : %d\n" % (list_serial_ports.GetCurrentSelection()))
+            # pub.sendMessage("print_console", message="Serial port selected : %d - %s\n" % (list_serial_ports.GetCurrentSelection(), list_serial_ports[list_serial_ports.GetCurrentSelection()].device % " - " % list_serial_ports[list_serial_ports.GetCurrentSelection()].description))
         return OnSelectSerial
+    
     
     def scan_com_ports(self, ports, ports_list, ports_description_list):
         """
         Scans the available COM ports, creates a list and fills the corresponding wx.choice
         """
         # self.consoleTextCtrl.AppendText("Searching for COM ports ...\n")
-        print("Searching for COM ports ...\n")
+        # print("Searching for COM ports ...\n") # DEBUG
+        pub.sendMessage("print_console", message="Searching for COM ports ...\n")
         for port in ports :
             ports_list.append(port.device) # Get port reference
             ports_description_list.append(port.device + " - " + port.description) # Construct a description for the GUI list
             # self.consoleTextCtrl.AppendText("COM port found : %s\n" % (port.device + " - " + port.description))
-            print("COM port found : %s\n" % (port.device + " - " + port.description))
+            # print("COM port found : %s\n" % (port.device + " - " + port.description)) # DEBUG
+            pub.sendMessage("print_console", message="COM port found : %s\n" % (port.device + " - " + port.description))
 
 
-class PanelConsole(wx.Panel):
+class PanelConsole(wx.Panel, object):
     """Console panel"""
     def __init__(self, parent, *args, **kwargs):
         """Create the Console panel"""
@@ -179,9 +196,20 @@ class PanelConsole(wx.Panel):
         
         self.SetSizer(sizer)
         self.Layout()
+        
+        pub.subscribe(self.sub_listener, "print_console")
+        
     
-    def print_console(text):
-        pass
+    def print_console(self, text):
+        self.consoleTextCtrl.AppendText(text)
+        
+    
+    def sub_listener(self, message):
+        """
+        Listener function
+        https://github.com/schollii/pypubsub/tree/master/examples/basic_kwargs
+        """
+        self.print_console(message)
 
 
 class MainFrame(wx.Frame):
@@ -204,11 +232,11 @@ class MainFrame(wx.Frame):
         panel = wx.Panel(self)
         vbox = wx.BoxSizer(wx.VERTICAL)
         
-        # Add main panel
-        self.PanelSerial = PanelSerial(self)
-        
         # Add console panel
         self.PanelConsole = PanelConsole(self)
+        
+        # Add main panel
+        self.PanelSerial = PanelSerial(self)
         
         # vbox.Add(self.PanelSerial, 0, wx.EXPAND | wx.UP, 5)
         # vbox.Add(self.PanelConsole, 1, wx.EXPAND)
@@ -228,108 +256,6 @@ class MainFrame(wx.Frame):
         self.SetSizer(self.main_ui_grid_sizer)
         
         self.Fit()
-
-        # # create a panel in the frame
-        # pnl = wx.Panel(self)
-
-        # # put some text with a larger bold font on it
-        # # st = wx.StaticText(pnl, label="DR2 logger WX")
-        # # font = st.GetFont()
-        # # font.PointSize += 10
-        # # font = font.Bold()
-        # # st.SetFont(font)
-
-        # topSizer          = wx.BoxSizer(wx.HORIZONTAL)
-        # bottomSizer       = wx.BoxSizer(wx.VERTICAL)
-        # topleftSizer      = wx.BoxSizer(wx.VERTICAL)
-        # toprightSizer     = wx.BoxSizer(wx.VERTICAL)
-        # middleSizer       = wx.BoxSizer(wx.HORIZONTAL)
-        # sizer             = wx.BoxSizer(wx.VERTICAL)
-        
-        # # Top left sizer : serial config
-        # self.buttonRefresh     = wx.Button(pnl, label="Refresh", size=wx.Size(100, 32))
-        # self.buttonConnect     = wx.Button(pnl, label="Connect", size=wx.Size(100, 32))
-        # # self.listSerialPorts   = wx.Choice(pnl, choices=[])
-        # self.listSerialPorts   = wx.Choice(pnl)
-        
-        # # Populate COM ports
-        # self.scan_com_ports(pnl)
-        
-        # topleftSizer.Add(self.listSerialPorts, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        # topleftSizer.Add(self.buttonRefresh, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        # topleftSizer.Add(self.buttonConnect, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        
-        # # Top right sizer : application parameters
-        # button1     = wx.Button(pnl, label="1", size=wx.Size(100, 30), style = wx.ALIGN_LEFT)
-        # button2     = wx.Button(pnl, label="2", size=wx.Size(100, 30), style = wx.ALIGN_LEFT)
-        # button3     = wx.Button(pnl, label="3", size=wx.Size(100, 30), style = wx.ALIGN_LEFT)
-        # button4     = wx.Button(pnl, label="4", size=wx.Size(100, 30), style = wx.ALIGN_LEFT)
-        
-        # toprightSizer.Add(button1, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        # toprightSizer.Add(button2, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        # toprightSizer.Add(button3, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        # toprightSizer.Add(button4, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        
-        # # Top sizer
-        # topSizer.Add(topleftSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
-        # topSizer.Add(toprightSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
-        
-        # # Middle sizer : logger controls
-        # self.listGame        = wx.Choice(pnl, choices=["DiRT 1", "DiRT 2.0", "Richard Burns Rally"])
-        # self.buttonClearRun  = wx.Button(pnl, label="Clear run", size=wx.Size(100, 32))
-        # self.buttonPlot      = wx.Button(pnl, label="Plot", size=wx.Size(100, 32))
-        # self.buttonPlotAll   = wx.Button(pnl, label="PlotAll", size=wx.Size(100, 32))
-        # self.buttonSave      = wx.Button(pnl, label="Save", size=wx.Size(100, 32))
-        # self.buttonLoad      = wx.Button(pnl, label="Load", size=wx.Size(100, 32))
-        
-        # middleSizer.Add(self.listGame, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
-        # middleSizer.Add(self.buttonClearRun, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
-        # middleSizer.Add(self.buttonPlot, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
-        # middleSizer.Add(self.buttonPlotAll, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
-        # middleSizer.Add(self.buttonSave, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
-        # middleSizer.Add(self.buttonLoad, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
-        
-        # # Bottom sizer : console output
-        # self.button_loggerStart  = wx.Button(pnl, label="Start logging", size=wx.Size(100, 30), style = wx.ALIGN_LEFT)
-        # self.consoleTextCtrl   = wx.TextCtrl(pnl, size=wx.Size(600, 600), style=wx.TE_MULTILINE|wx.TE_READONLY)
-        
-        # bottomSizer.Add(self.button_loggerStart, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        # bottomSizer.Add(self.consoleTextCtrl, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        
-        # # Main frame sizer
-        # sizer.Add(topSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
-        # sizer.Add(wx.StaticLine(pnl,), 0, wx.ALL|wx.EXPAND, 5)
-        # sizer.Add(middleSizer, 1, wx.ALL|wx.EXPAND|wx.CENTER)
-        # sizer.Add(wx.StaticLine(pnl,), 0, wx.ALL|wx.EXPAND, 5)
-        # sizer.Add(bottomSizer, 2, wx.ALL|wx.EXPAND|wx.CENTER)
-        
-        # # create a menu bar
-        # self.makeMenuBar()
-
-        # # and a status bar
-        # self.CreateStatusBar()
-        # self.SetStatusText("Welcome to DR2 logger WX!")
-        
-        # pnl.SetSizer(sizer)
-        # pnl.SetAutoLayout(1)
-        # # pnl.SetSize((1000, 800))
-        # sizer.Fit(self)
-        
-        # self.Show()
-        
-        # # Bind start logging button
-        # self.Bind(wx.EVT_BUTTON, self.OnClickStartLogging, self.button_loggerStart)
-        # self.Bind(wx.EVT_BUTTON, self.OnClickClearRun, self.buttonClearRun)
-        # self.Bind(wx.EVT_BUTTON, self.OnClickPlot, self.buttonPlot)
-        # self.Bind(wx.EVT_BUTTON, self.OnClickPlotAll, self.buttonPlotAll)
-        # self.Bind(wx.EVT_BUTTON, self.OnClickSave, self.buttonSave)
-        # self.Bind(wx.EVT_BUTTON, self.OnClickLoad, self.buttonLoad)
-        # self.Bind(wx.EVT_CHOICE, self.OnSelectGame, self.listGame)
-        # self.Bind(wx.EVT_CHOICE, self.OnSelectSerial, self.listSerialPorts)
-        # self.Bind(wx.EVT_BUTTON, self.OnClickPortsRefresh, self.buttonRefresh)
-        # self.Bind(wx.EVT_BUTTON, self.OnClickPortsConnect, self.buttonConnect)
-        
-        # self.thread_udp = threading.Thread(target=udp_listen(self.print_log))
 
     def makeMenuBar(self):
         """
@@ -371,27 +297,6 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnExit,  exitItem)
         self.Bind(wx.EVT_MENU, self.OnAbout, aboutItem)
 
-    # def scan_com_ports(self, panel):
-        # """
-        # Scans the available COM ports, creates a list and fills the corresponding wx.choice
-        # """
-        # print(panel.buttonPlotAll)
-        # # self.consoleTextCtrl.AppendText("Searching for COM ports ...\n")
-        # # self.print_log("Searching for COM ports ...\n")
-        # # print_function("Searching for COM ports ...\n")
-        # # Serial ports
-        # self.ports = serial.tools.list_ports.comports()
-        # self.ports_list = [] # List of ports references
-        # self.ports_description_list = [] # List of serial ports descriptions, for ease of identification on GUI
-        # for port in self.ports :
-            # self.ports_list.append(port.device) # Get port reference
-            # self.ports_description_list.append(port.device + " - " + port.description) # Construct a description for the GUI list
-            # # self.consoleTextCtrl.AppendText("COM port found : %s\n" % (port.device + " - " + port.description))
-            # # self.print_log("COM port found : %s\n" % (port.device + " - " + port.description))
-            # # print_function("COM port found : %s\n" % (port.device + " - " + port.description))
-        # #self.port_choice = wx.Choice(pnl, choices=self.ports_description_list)
-        # #self.serial_connect = wx.Button(pnl, label="Connect")
-        # # self.listSerialPorts.Create(self, choices=self.ports_description_list)
 
     def OnExit(self, event):
         """Close the frame, terminating the application."""
@@ -408,75 +313,6 @@ class MainFrame(wx.Frame):
         wx.MessageBox("This is a wxPython adaptation of DR2 logger",
                       "About DR2 logger WX",
                       wx.OK|wx.ICON_INFORMATION)
-
-    # def OnClickStartLogging(self, event):
-        # global logger_backend
-        # # Start / Stop DR2logger process
-        # global logger_stared
-        # if logger_stared==False:
-            # logger_stared=True
-            # self.button_loggerStart.SetLabel("Stop logging")
-            # thread_dr2logger_init(self.print_log)
-            # self.thread_udp.daemon = True
-            # self.thread_udp.start()
-        # else:
-            # logger_stared=False
-            # self.button_loggerStart.SetLabel("Start logging")
-            # self.thread_udp.join()
-            # logger_backend.end_logging()
-    
-    # def print_log(self, text):
-        # self.consoleTextCtrl.AppendText(text)
-        
-    # def OnClickClearRun(self, event):
-        # global logger_backend
-        # logger_backend.clear_session_collection()
-        # self.consoleTextCtrl.AppendText("Clear run\n") # DEBUG
-    
-    # def OnClickPlot(self, event):
-        # global logger_backend
-        # self.consoleTextCtrl.AppendText("Plot relevant data\n") # DEBUG
-        # if logger_backend.get_num_samples() == 0:
-            # self.consoleTextCtrl.AppendText('No data points to plot\n')
-        # else:
-            # self.consoleTextCtrl.AppendText('Plotting {} data points\n'.format(logger_backend.get_num_samples()))
-            # logger_backend.show_plots(True)
-        
-    # def OnClickPlotAll(self, event):
-        # global logger_backend
-        # self.consoleTextCtrl.AppendText("Plot all data\n") # DEBUG
-        # logger_backend.save_run()
-    
-    # def OnClickSave(self, event):
-        # global logger_backend
-        # self.consoleTextCtrl.AppendText("Save run\n") # DEBUG
-        # logger_backend.save_run()
-    
-    # def OnClickLoad(self, event):
-        # global logger_backend
-        # self.consoleTextCtrl.AppendText("Load run\n") # DEBUG
-        # logger_backend.load_run()
-        # print_current_state(logger_backend.get_game_state_str())
-    
-    # def OnSelectGame(self, event):
-        # global logger_backend
-        # self.consoleTextCtrl.AppendText("Game selected : %d\n" % self.listGame.GetCurrentSelection()) # DEBUG
-        # if self.listGame.GetCurrentSelection() < len(LoggerBackend.get_all_valid_games()):
-            # new_game_name = LoggerBackend.get_all_valid_games()[self.listGame.GetCurrentSelection()]
-            # logger_backend.change_game(new_game_name)
-            # self.consoleTextCtrl.AppendText('Switched game to "{}"\n'.format(logger_backend.game_name))
-        # else:
-            # self.consoleTextCtrl.AppendText('Incorrect game index\n')
-    
-    # def OnSelectSerial(self, event):
-        # self.consoleTextCtrl.AppendText("Serial port selected : %d\n" % self.listSerialPorts.GetCurrentSelection()) # DEBUG
-    
-    # def OnClickPortsRefresh(self, event):
-        # self.scan_com_ports()
-        
-    # def OnClickPortsConnect(self, event):
-        # self.consoleTextCtrl.AppendText("Connect to display ... (do nothing at the moment)\n") # DEBUG
-        
 
 
 if __name__ == '__main__':
