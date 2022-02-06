@@ -55,26 +55,25 @@ Enter:
 "g game_name" to switch the target game, values for game_name: {}
 '''.format(LoggerBackend.get_all_valid_games())
 
-def udp_listen(print_function):
+def udp_listen():
     global logger_backend
     
     while logger_stared:
         logger_backend.check_udp_messages()
         print_current_state(logger_backend.get_game_state_str())
         
-        message = logger_backend.check_state_changes()
-        if len(message) > 0:
-            print_function(message)
+        msg = logger_backend.check_state_changes()
+        if len(msg) > 0:
+            pub.sendMessage("print_console", message=msg)
 
-def thread_dr2logger_init(print_function):
+def thread_dr2logger_init():
     global logger_backend
     
     end_program = False
 
     # print_function(commands_hint)
-    print_function(intro_text)
+    pub.sendMessage("print_console", message=intro_text)
 
-    # logger_backend = LoggerBackend(debugging=debugging, log_raw_data=log_raw_data)
     logger_backend.start_logging()
     
 def print_current_state(state_str):
@@ -100,8 +99,9 @@ def print_current_state(state_str):
             pass
 
 
+# ======================================================================================
 class PanelSerial(wx.Panel, object):
-    """Main panel"""
+    """Serial panel - Manages the serial communication, scans the available ports"""
     def __init__(self, parent, *args, **kwargs):
         """Create the PanelSerial."""
         wx.Panel.__init__(self, parent, *args, **kwargs)
@@ -129,15 +129,14 @@ class PanelSerial(wx.Panel, object):
         buttonConnect     = wx.Button(self, label="Connect", size=wx.Size(100, 32))
         buttonConnect.Bind(wx.EVT_BUTTON, self.getOnClickPortsConnect(ports_list, listSerialPorts.GetCurrentSelection()))
         
-        sizer      = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(listSerialPorts, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        sizer.Add(buttonRefresh, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        sizer.Add(buttonConnect, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerSerial = wx.StaticBoxSizer(wx.VERTICAL, self, "Serial communication")
+        boxSizerSerial.Add(listSerialPorts, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerSerial.Add(buttonRefresh, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerSerial.Add(buttonConnect, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         
-        self.SetSizer(sizer)
+        # self.SetSizer(sizer)
+        self.SetSizer(boxSizerSerial)
         self.Layout()
-        
-        msg = "test"
         
     
     def OnClickPortsRefresh(self, event):
@@ -152,7 +151,8 @@ class PanelSerial(wx.Panel, object):
             # pub.sendMessage("print_console", message="Ports connect") # DEBUG
             ser = serial.Serial(ports_list[port_current_selection], 115200)
             # print(ser.name) # DEBUG
-            pub.sendMessage("print_console", message=ser.name)
+            pub.sendMessage("print_console", message="Connection to port: %s - Bandrate: %d" % (ser.name, 115200))
+            # pub.sendMessage("print_console", message=ser.name)
         return OnClickPortsConnect
         
     
@@ -180,21 +180,22 @@ class PanelSerial(wx.Panel, object):
             # print("COM port found : %s\n" % (port.device + " - " + port.description)) # DEBUG
             pub.sendMessage("print_console", message="COM port found : %s\n" % (port.device + " - " + port.description))
 
-
+# ======================================================================================
 class PanelConsole(wx.Panel, object):
-    """Console panel"""
+    """Console panel - Displays messages, replaces print"""
     def __init__(self, parent, *args, **kwargs):
         """Create the Console panel"""
         wx.Panel.__init__(self, parent, *args, **kwargs)
 
         self.parent = parent
         
-        self.consoleTextCtrl   = wx.TextCtrl(self, size=wx.Size(600, 600), style=wx.TE_MULTILINE|wx.TE_READONLY)
+        self.consoleTextCtrl   = wx.TextCtrl(self, size=wx.Size(600, 400), style=wx.TE_MULTILINE|wx.TE_READONLY)
         
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.consoleTextCtrl, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerConsole = wx.StaticBoxSizer(wx.VERTICAL, self, "Console output")
+        boxSizerConsole = wx.BoxSizer(wx.VERTICAL)
+        boxSizerConsole.Add(self.consoleTextCtrl, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         
-        self.SetSizer(sizer)
+        self.SetSizer(boxSizerConsole)
         self.Layout()
         
         pub.subscribe(self.sub_listener, "print_console")
@@ -212,6 +213,105 @@ class PanelConsole(wx.Panel, object):
         self.print_console(message)
 
 
+# ======================================================================================
+class PanelLogger(wx.Panel, object):
+    """Logger panel - Manages telemtry logger"""
+    def __init__(self, parent, *args, **kwargs):
+        """Create the Console panel"""
+        wx.Panel.__init__(self, parent, *args, **kwargs)
+
+        self.parent = parent
+        
+        listGame        = wx.Choice(self, choices=["DiRT 1", "DiRT 2.0", "Richard Burns Rally"])
+        buttonClearRun  = wx.Button(self, label="Clear run", size=wx.Size(100, 32))
+        buttonPlot      = wx.Button(self, label="Plot", size=wx.Size(100, 32))
+        buttonPlotAll   = wx.Button(self, label="PlotAll", size=wx.Size(100, 32))
+        buttonSave      = wx.Button(self, label="Save", size=wx.Size(100, 32))
+        buttonLoad      = wx.Button(self, label="Load", size=wx.Size(100, 32))
+        
+        self.buttonStartLogging     = wx.Button(self, label="Start logging", size=wx.Size(100, 32))
+        
+        boxSizerLogger = wx.StaticBoxSizer(wx.VERTICAL, self, "Logger")
+        boxSizerLogger.Add(listGame, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerLogger.Add(self.buttonStartLogging, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerLogger.Add(buttonClearRun, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerLogger.Add(buttonPlot, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerLogger.Add(buttonPlotAll, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerLogger.Add(buttonSave, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerLogger.Add(buttonLoad, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        
+        self.buttonStartLogging.Bind(wx.EVT_BUTTON, self.getOnClickStartLogging())
+        buttonClearRun.Bind(wx.EVT_BUTTON, self.getOnClickClearRun())
+        buttonPlot.Bind(wx.EVT_BUTTON, self.getOnClickPlot())
+        buttonPlotAll.Bind(wx.EVT_BUTTON, self.getOnClickPlotAll())
+        buttonSave.Bind(wx.EVT_BUTTON, self.getOnClickSave())
+        buttonLoad.Bind(wx.EVT_BUTTON, self.getOnClickLoad())
+        listGame.Bind(wx.EVT_CHOICE, self.getOnSelectGame())
+        
+        self.SetSizer(boxSizerLogger)
+        self.Layout()
+        
+        # Start logger thread
+        self.thread_udp = threading.Thread(target=udp_listen()) 
+        
+    def getOnClickStartLogging(self):
+        def OnClickStartLogging(event):
+            global logger_backend
+            # Start / Stop DR2logger process
+            global logger_stared
+            if logger_stared==False:
+                pub.sendMessage("print_console", message="Start logging\n")
+                logger_stared=True
+                self.buttonStartLogging.SetLabel("Stop logging")
+                thread_dr2logger_init()
+                self.thread_udp.daemon = True
+                self.thread_udp.start()
+            else:
+                pub.sendMessage("print_console", message="Stop logging\n")
+                logger_stared=False
+                self.buttonStartLogging.SetLabel("Start logging")
+                self.thread_udp.join()
+                logger_backend.end_logging()
+        return OnClickStartLogging
+        
+    def getOnClickClearRun(self):
+        def OnClickClearRun(event):
+            # print("Clear run") # DEBUG
+            pub.sendMessage("print_console", message="Clear run\n")
+        return OnClickClearRun
+    
+    def getOnClickPlot(self):
+        def OnClickPlot(event):
+            # print("Plot") # DEBUG
+            pub.sendMessage("print_console", message="Plot\n")
+        return OnClickPlot
+    
+    def getOnClickPlotAll(self):
+        def OnClickPlotAll(event):
+            # print("Plot all") # DEBUG
+            pub.sendMessage("print_console", message="PlotAll\n")
+        return OnClickPlotAll
+    
+    def getOnClickSave(self):
+        def OnClickSave(event):
+            # print("Save") # DEBUG
+            pub.sendMessage("print_console", message="Save\n")
+        return OnClickSave
+    
+    def getOnClickLoad(self):
+        def OnClickLoad(event):
+            # print("Load") # DEBUG
+            pub.sendMessage("print_console", message="Load\n")
+        return OnClickLoad
+    
+    def getOnSelectGame(self):
+        def OnSelectGame(event):
+            # print("Game selected") # DEBUG
+            pub.sendMessage("print_console", message="Game selected\n")
+        return OnSelectGame
+
+
+# ======================================================================================
 class MainFrame(wx.Frame):
     """
     Main program frame
@@ -238,6 +338,9 @@ class MainFrame(wx.Frame):
         # Add main panel
         self.PanelSerial = PanelSerial(self)
         
+        # Add Logger panel
+        self.PanelLogger = PanelLogger(self)
+        
         # vbox.Add(self.PanelSerial, 0, wx.EXPAND | wx.UP, 5)
         # vbox.Add(self.PanelConsole, 1, wx.EXPAND)
         # vbox.Add((3, -1))
@@ -252,6 +355,7 @@ class MainFrame(wx.Frame):
         # self.main_ui_grid_sizer.Add(self.PanelSerial, pos=(0,0), flag=wx.EXPAND)
         self.main_ui_grid_sizer.Add(self.PanelSerial, pos=(0,0))
         self.main_ui_grid_sizer.Add(self.PanelConsole, pos=(0,1), flag=wx.EXPAND)
+        self.main_ui_grid_sizer.Add(self.PanelLogger, pos=(1,0), flag=wx.EXPAND)
         
         self.SetSizer(self.main_ui_grid_sizer)
         
