@@ -10,10 +10,13 @@ from pubsub import pub
 import serial
 from serial.tools import list_ports
 
+import io
 import os
 import sys
 import threading
 import queue
+
+from contextlib import redirect_stdout # For stdout redirecting
 
 from source.logger_backend import LoggerBackend
 
@@ -199,11 +202,12 @@ class PanelConsole(wx.Panel, object):
         self.Layout()
         
         pub.subscribe(self.sub_listener, "print_console")
-        
+    
+    def write(self, text):
+        self.consoleTextCtrl.AppendText(text)
     
     def print_console(self, text):
         self.consoleTextCtrl.AppendText(text)
-        
     
     def sub_listener(self, message):
         """
@@ -211,6 +215,7 @@ class PanelConsole(wx.Panel, object):
         https://github.com/schollii/pypubsub/tree/master/examples/basic_kwargs
         """
         self.print_console(message)
+        self.print_console("\n")
 
 
 # ======================================================================================
@@ -260,14 +265,14 @@ class PanelLogger(wx.Panel, object):
             # Start / Stop DR2logger process
             global logger_stared
             if logger_stared==False:
-                pub.sendMessage("print_console", message="Start logging\n")
+                pub.sendMessage("print_console", message="Start logging")
                 logger_stared=True
                 self.buttonStartLogging.SetLabel("Stop logging")
                 thread_dr2logger_init()
                 self.thread_udp.daemon = True
                 self.thread_udp.start()
             else:
-                pub.sendMessage("print_console", message="Stop logging\n")
+                pub.sendMessage("print_console", message="Stop logging")
                 logger_stared=False
                 self.buttonStartLogging.SetLabel("Start logging")
                 self.thread_udp.join()
@@ -276,38 +281,57 @@ class PanelLogger(wx.Panel, object):
         
     def getOnClickClearRun(self):
         def OnClickClearRun(event):
+            global logger_backend
             # print("Clear run") # DEBUG
-            pub.sendMessage("print_console", message="Clear run\n")
+            # pub.sendMessage("print_console", message="Clear run")
+            pub.sendMessage("print_console", message='Cleared {} data points\n'.format(logger_backend.get_num_samples()))
+            logger_backend.clear_session_collection()
         return OnClickClearRun
     
     def getOnClickPlot(self):
         def OnClickPlot(event):
             # print("Plot") # DEBUG
-            pub.sendMessage("print_console", message="Plot\n")
+            pub.sendMessage("print_console", message="Plot")
+            if logger_backend.get_num_samples() == 0:
+                pub.sendMessage("print_console", message='No data points to plot\n')
+            else:
+                pub.sendMessage("print_console", message='Plotting {} data points\n'.format(logger_backend.get_num_samples()))
+                logger_backend.show_plots(False)
         return OnClickPlot
     
     def getOnClickPlotAll(self):
         def OnClickPlotAll(event):
             # print("Plot all") # DEBUG
-            pub.sendMessage("print_console", message="PlotAll\n")
+            pub.sendMessage("print_console", message="PlotAll")
+            if logger_backend.get_num_samples() == 0:
+                pub.sendMessage("print_console", message='No data points to plot\n')
+            else:
+                pub.sendMessage("print_console", message='Plotting {} data points\n'.format(logger_backend.get_num_samples()))
+                logger_backend.show_plots(True)
         return OnClickPlotAll
     
     def getOnClickSave(self):
         def OnClickSave(event):
             # print("Save") # DEBUG
-            pub.sendMessage("print_console", message="Save\n")
+            pub.sendMessage("print_console", message="Save")
+            logger_backend.save_run()
         return OnClickSave
     
     def getOnClickLoad(self):
         def OnClickLoad(event):
             # print("Load") # DEBUG
-            pub.sendMessage("print_console", message="Load\n")
+            pub.sendMessage("print_console", message="Load")
+            logger_backend.load_run()
+            print_current_state(logger_backend.get_game_state_str())
         return OnClickLoad
     
     def getOnSelectGame(self):
         def OnSelectGame(event):
             # print("Game selected") # DEBUG
-            pub.sendMessage("print_console", message="Game selected\n")
+            pub.sendMessage("print_console", message="Game selected")
+            # new_game_name = command.split(' ')[1]
+            # logger_backend.change_game(new_game_name)
+            # print('Switched game to "{}"'.format(logger_backend.game_name))
         return OnSelectGame
 
 
@@ -432,4 +456,12 @@ if __name__ == '__main__':
     
     # thread_dr2logger_init()
     
+    # Overwrite print to redirect stdout to the console panel
+    old_stdout = sys.stdout
+    new_stdout = frm.PanelConsole
+    sys.stdout = new_stdout
+    
     app.MainLoop()
+    
+    # Rollback to standard stdout
+    sys.stdout = old_stdout
