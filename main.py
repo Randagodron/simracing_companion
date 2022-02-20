@@ -4,21 +4,42 @@ DR2 logger with wxPython GUI
 Following : https://wiki.wxpython.org/wxPython%20Style%20Guide
 """
 
+"""
+    Libraries
+"""
+
+# WX and inter-frame communication
 import wx
+import wx.lib.agw.speedmeter as SM
 from pubsub import pub
 
+# Serial communication
 import serial
 from serial.tools import list_ports
 
+# General OS libs
 import io
 import os
 import sys
 import threading
 import queue
 
-from contextlib import redirect_stdout # For stdout redirecting
+# For YAML file read
+import yaml
+import os.path
 
+# For stdout redirecting
+# from contextlib import redirect_stdout
+
+# Misc. imports
+from math import pi, sqrt
+
+# Dr2_logger classes
 from source.logger_backend import LoggerBackend
+
+"""
+  Code start
+"""
 
 log_raw_data = False
 debugging = False
@@ -141,6 +162,9 @@ class PanelSerial(wx.Panel, object):
         self.SetSizer(boxSizerSerial)
         self.Layout()
         
+        # Subscribe to general config and serial config
+        pub.subscribe(self.sub_listener, "config_general")
+        pub.subscribe(self.sub_listener, "config_serial")
     
     def OnClickPortsRefresh(self, event):
         # self.scan_com_ports()
@@ -148,7 +172,6 @@ class PanelSerial(wx.Panel, object):
         # pub.sendMessage("print_console", message="Refresh") # DEBUG
         pass
         
-    
     def getOnClickPortsConnect(self, ports_list, port_current_selection):
         def OnClickPortsConnect(event):
             # pub.sendMessage("print_console", message="Ports connect") # DEBUG
@@ -158,7 +181,6 @@ class PanelSerial(wx.Panel, object):
             # pub.sendMessage("print_console", message=ser.name)
         return OnClickPortsConnect
         
-    
     """https://stackoverflow.com/questions/173687/is-it-possible-to-pass-arguments-into-event-bindings"""
     def getOnSelectSerial(self, list_serial_ports):
         def OnSelectSerial(event):
@@ -167,7 +189,6 @@ class PanelSerial(wx.Panel, object):
             pub.sendMessage("print_console", message="Serial port selected : %d\n" % (list_serial_ports.GetCurrentSelection()))
             # pub.sendMessage("print_console", message="Serial port selected : %d - %s\n" % (list_serial_ports.GetCurrentSelection(), list_serial_ports[list_serial_ports.GetCurrentSelection()].device % " - " % list_serial_ports[list_serial_ports.GetCurrentSelection()].description))
         return OnSelectSerial
-    
     
     def scan_com_ports(self, ports, ports_list, ports_description_list):
         """
@@ -182,6 +203,13 @@ class PanelSerial(wx.Panel, object):
             # self.consoleTextCtrl.AppendText("COM port found : %s\n" % (port.device + " - " + port.description))
             # print("COM port found : %s\n" % (port.device + " - " + port.description)) # DEBUG
             pub.sendMessage("print_console", message="COM port found : %s\n" % (port.device + " - " + port.description))
+            
+    def sub_listener(self, message):
+        """
+        Listener function
+        """
+        print(message)
+
 
 # ======================================================================================
 class PanelConsole(wx.Panel, object):
@@ -201,7 +229,9 @@ class PanelConsole(wx.Panel, object):
         self.SetSizer(boxSizerConsole)
         self.Layout()
         
+        # Subscribe to general config and console outputs
         pub.subscribe(self.sub_listener, "print_console")
+        # pub.subscribe(self.sub_listener, "config_general")
     
     def write(self, text):
         self.consoleTextCtrl.AppendText(text)
@@ -257,7 +287,11 @@ class PanelLogger(wx.Panel, object):
         self.Layout()
         
         # Start logger thread
-        self.thread_udp = threading.Thread(target=udp_listen()) 
+        self.thread_udp = threading.Thread(target=udp_listen())
+        
+        # Subscribe to general config
+        pub.subscribe(self.sub_listener, "config_general")
+        pub.subscribe(self.sub_listener, "config_logger")
         
     def getOnClickStartLogging(self):
         def OnClickStartLogging(event):
@@ -333,6 +367,161 @@ class PanelLogger(wx.Panel, object):
             # logger_backend.change_game(new_game_name)
             # print('Switched game to "{}"'.format(logger_backend.game_name))
         return OnSelectGame
+        
+    def sub_listener(self, message):
+        """
+        Listener function
+        """
+        pass
+
+
+# ======================================================================================
+class PanelDashboard(wx.Panel, object):
+    """Logger panel - Manages telemtry logger"""
+    def __init__(self, parent, *args, **kwargs):
+        """Create the Console panel"""
+        wx.Panel.__init__(self, parent, *args, **kwargs)
+
+        self.parent = parent
+        
+        # # # # staticTextPlaceholder = wx.StaticText(self, label="Empty")
+        # # # rpmMeter = SM.SpeedMeter(self, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS);
+        # # # speedMeter = SM.SpeedMeter(self, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS);
+        
+        # # # # Set The Region Of Existence Of SpeedMeter (Always In Radians!!!!)
+        # # # rpmMeter.SetAngleRange(-pi/6, 7*pi/6)
+        # # # speedMeter.SetAngleRange(-pi/6, 7*pi/6)
+        
+        # # # # Create The Intervals That Will Divide Our SpeedMeter In Sectors
+        # # # intervals = range(0, 201, 20)
+        # # # rpmMeter.SetIntervals(intervals)
+        # # # speedMeter.SetIntervals(intervals)
+        
+        # # # # Assign The Same Colours To All Sectors (We Simulate A Car Control For Speed)
+        # # # # Usually This Is Black
+        # # # colours = [wx.BLACK]*10
+        # # # rpmMeter.SetIntervalColours(colours)
+        # # # speedMeter.SetIntervalColours(colours)
+        
+        # # # # Assign The Ticks: Here They Are Simply The String Equivalent Of The Intervals
+        # # # ticks = [str(interval) for interval in intervals]
+        # # # rpmMeter.SetTicks(ticks)
+        # # # speedMeter.SetTicks(ticks)
+        # # # # Set The Ticks/Tick Markers Colour
+        # # # rpmMeter.SetTicksColour(wx.WHITE)
+        # # # speedMeter.SetTicksColour(wx.WHITE)
+        # # # # We Want To Draw 5 Secondary Ticks Between The Principal Ticks
+        # # # rpmMeter.SetNumberOfSecondaryTicks(5)
+        # # # speedMeter.SetNumberOfSecondaryTicks(5)
+        
+        # # # # Set The Font For The Ticks Markers
+        # # # rpmMeter.SetTicksFont(wx.Font(7, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        # # # speedMeter.SetTicksFont(wx.Font(7, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        
+        # # # # Set The Text In The Center Of SpeedMeter
+        # # # rpmMeter.SetMiddleText("RPM")
+        # # # speedMeter.SetMiddleText("Km/h")
+        # # # # Assign The Colour To The Center Text
+        # # # rpmMeter.SetMiddleTextColour(wx.WHITE)
+        # # # speedMeter.SetMiddleTextColour(wx.WHITE)
+        # # # # Assign A Font To The Center Text
+        # # # rpmMeter.SetMiddleTextFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        # # # speedMeter.SetMiddleTextFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        
+        # # # # Set The Colour For The Hand Indicator
+        # # # rpmMeter.SetHandColour(wx.Colour(255, 50, 0))
+        # # # speedMeter.SetHandColour(wx.Colour(255, 50, 0))
+        
+        # # # # Do Not Draw The External (Container) Arc. Drawing The External Arc May
+        # # # # Sometimes Create Uglier Controls. Try To Comment This Line And See It
+        # # # # For Yourself!
+        # # # rpmMeter.DrawExternalArc(False)
+        # # # speedMeter.DrawExternalArc(False)
+        
+        # # # # Set The Current Value For The SpeedMeter
+        # # # rpmMeter.SetSpeedValue(44)
+        # # # speedMeter.SetSpeedValue(44)
+        
+        # # # boxSizerDashboard = wx.StaticBoxSizer(wx.VERTICAL, self, "Dashboard")
+        # # # # boxSizerDashboard.Add(staticTextPlaceholder, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        # # # boxSizerDashboard.Add(rpmMeter, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        # # # # boxSizerDashboard.Add(speedMeter, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        
+        panel = wx.Panel(self, wx.ID_ANY)
+        panel1 = wx.Panel(panel, wx.ID_ANY, style=wx.SUNKEN_BORDER)
+
+        self.speed = SM.SpeedMeter(panel1, -1, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS, size = (300,300), mousestyle=0)
+
+        self.speed.SetAngleRange(-pi/6, 7*pi/6)
+        intervals = range(0, 201, 20)
+        self.speed.SetIntervals(intervals)
+        colours = [wx.BLACK]*10
+        self.speed.SetIntervalColours(colours)
+        ticks = [str(interval) for interval in intervals]
+        self.speed.SetTicks(ticks)
+        self.speed.SetTicksColour(wx.WHITE)
+        self.speed.SetNumberOfSecondaryTicks(5)
+        self.speed.SetTicksFont(wx.Font(7, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        self.speed.SetMiddleText("RPM")
+        self.speed.SetMiddleTextColour(wx.WHITE)
+        self.speed.SetMiddleTextFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        self.speed.SetHandColour(wx.Colour(255, 50, 0))
+        self.speed.DrawExternalArc(False)
+        self.speed.SetSpeedValue(44)
+    #Bind mouse events
+        # self.speed.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)
+        # self.speed.SetToolTip(wx.ToolTip("Drag the speed dial to change the speed!"))
+    #Define the control slider
+        self.slider = wx.Slider(panel1, -1, 44, 0, 200,
+                           style=wx.SL_HORIZONTAL | wx.SL_AUTOTICKS | wx.SL_LABELS )
+        self.slider.SetTickFreq(5)
+    #Bind the slider
+        self.slider.Bind(wx.EVT_SCROLL, self.OnSliderScroll)
+        self.slider.SetToolTip(wx.ToolTip("Drag The Slider To Change The Speed!"))
+
+    #Create required sizers
+        vsizer1 = wx.BoxSizer(wx.VERTICAL)
+        hsizer1 = wx.BoxSizer(wx.HORIZONTAL)
+
+        hsizer1.Add(self.slider, 1, wx.EXPAND)
+        vsizer1.Add(self.speed, 0, wx.EXPAND)
+        vsizer1.Add(hsizer1, 0, wx.EXPAND)
+        
+        # vsizer2 = wx.BoxSizer(wx.VERTICAL)
+        # hsizer2 = wx.BoxSizer(wx.HORIZONTAL)
+
+        # hsizer2.Add(self.slider, 1, wx.EXPAND)
+        # vsizer2.Add(self.speed, 0, wx.EXPAND)
+        # vsizer2.Add(hsizer1, 0, wx.EXPAND)
+    #Set the panel1 sizer
+        panel1.SetSizer(vsizer1)
+    #Fit contents
+        panel1.Fit()
+        
+    #Implement the main sizer
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+        mainSizer.Add(panel, 1, wx.EXPAND)
+        self.SetSizer(mainSizer)
+        mainSizer.Layout()
+        
+        # # # boxSizerDashboard = wx.StaticBoxSizer(wx.VERTICAL, self, "Dashboard")
+        # # # # boxSizerDashboard.Add(staticTextPlaceholder, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        # # # boxSizerDashboard.Add(rpmMeter, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        # # # # boxSizerDashboard.Add(speedMeter, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        
+        ################################
+        # # # self.SetSizer(boxSizerDashboard)
+        # # # self.Layout()
+
+    def OnSliderScroll(self, event):
+        slider = event.GetEventObject()
+        self.speed.SetSpeedValue(slider.GetValue())
+        event.Skip()
+
+    # def OnMouse(self, event):
+        # speed = event.GetEventObject()
+        # self.slider.SetValue(speed.GetSpeedValue())
+        # event.Skip()
 
 
 # ======================================================================================
@@ -365,6 +554,9 @@ class MainFrame(wx.Frame):
         # Add Logger panel
         self.PanelLogger = PanelLogger(self)
         
+        # Add Dashboard panel
+        self.PanelDashboard = PanelDashboard(self)
+        
         # vbox.Add(self.PanelSerial, 0, wx.EXPAND | wx.UP, 5)
         # vbox.Add(self.PanelConsole, 1, wx.EXPAND)
         # vbox.Add((3, -1))
@@ -380,10 +572,14 @@ class MainFrame(wx.Frame):
         self.main_ui_grid_sizer.Add(self.PanelSerial, pos=(0,0))
         self.main_ui_grid_sizer.Add(self.PanelConsole, pos=(0,1), flag=wx.EXPAND)
         self.main_ui_grid_sizer.Add(self.PanelLogger, pos=(1,0), flag=wx.EXPAND)
+        self.main_ui_grid_sizer.Add(self.PanelDashboard, pos=(1,1), flag=wx.EXPAND)
         
         self.SetSizer(self.main_ui_grid_sizer)
         
         self.Fit()
+        
+        # Subscribe to general configs
+        pub.subscribe(self.sub_listener, "config_general")
 
     def makeMenuBar(self):
         """
@@ -398,6 +594,8 @@ class MainFrame(wx.Frame):
         # the same event
         helloItem = fileMenu.Append(-1, "&Hello...\tCtrl-H",
                 "Help string shown in status bar for this menu item")
+        loadConfigItem = fileMenu.Append(-1, "&Load configuration...\tCtrl-L",
+                "Loads a configuration file")
         fileMenu.AppendSeparator()
         # When using a stock ID we don't need to specify the menu item's
         # label
@@ -422,25 +620,59 @@ class MainFrame(wx.Frame):
         # each of the menu items. That means that when that menu item is
         # activated then the associated handler function will be called.
         self.Bind(wx.EVT_MENU, self.OnHello, helloItem)
+        self.Bind(wx.EVT_MENU, self.OnLoadConfig, loadConfigItem)
         self.Bind(wx.EVT_MENU, self.OnExit,  exitItem)
         self.Bind(wx.EVT_MENU, self.OnAbout, aboutItem)
-
 
     def OnExit(self, event):
         """Close the frame, terminating the application."""
         self.Close(True)
 
-
     def OnHello(self, event):
         """Say hello to the user."""
         wx.MessageBox("Hello again from wxPython")
-
 
     def OnAbout(self, event):
         """Display an About Dialog"""
         wx.MessageBox("This is a wxPython adaptation of DR2 logger",
                       "About DR2 logger WX",
                       wx.OK|wx.ICON_INFORMATION)
+    
+    def OnLoadConfig(self, event):
+        """Display a load dialog"""
+        with wx.FileDialog(self, "Open configuration file", wildcard="YAML files (*.yml)|*.yml",
+                       style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return     # the user changed their mind
+
+            # Proceed loading the file chosen by the user
+            pathname = fileDialog.GetPath()
+            try:
+                with open(pathname, 'r') as file:
+                    self.ParseConfigFile(file)
+                    pass
+            except IOError:
+                # wx.LogError("Cannot open file '%s'." % newfile)
+                print("Cannot open file '%s'." % newfile)
+    
+    def ParseConfigFile(self, file):
+        print("Loading new configuration ...")
+        # Load YAML file
+        # Dump all categories and publish to each channel
+        print(file.name)
+        stream = yaml.full_load(file)
+        for item, doc in stream.items():
+            print(item, ":", doc) # DEBUG
+            for obj in doc:
+                pub.sendMessage(item, message=obj)
+                # TODO : modify listener functions to accept data
+    
+    def sub_listener(self, message):
+        """
+        Listener function
+        """
+        pass
 
 
 if __name__ == '__main__':
@@ -456,7 +688,22 @@ if __name__ == '__main__':
     
     # thread_dr2logger_init()
     
-    # Overwrite print to redirect stdout to the console panel
+    # Read configuration file
+    # TODO : load file through File menu
+    # global config
+    
+    # if getattr(sys, 'frozen', None):
+        # approot = os.path.dirname(sys.executable)
+    # else:
+        # approot = os.path.dirname(os.path.realpath(__file__))
+    
+    # try:
+        # config = yaml.load(file(approot + '/config.yml', 'r'))
+    # except yaml.YAMLError as exc:
+        # print ("Error in configuration file:{}", exc)
+    
+    # Overload print to redirect stdout to the console panel
+    """https://stackoverflow.com/questions/550470/overload-print-python"""
     old_stdout = sys.stdout
     new_stdout = frm.PanelConsole
     sys.stdout = new_stdout

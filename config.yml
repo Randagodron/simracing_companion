@@ -1,0 +1,60 @@
+# General configurations
+config_general:
+    speed_units: kph # or mph
+
+config_serial:
+    dashboard_com_port: COM6
+
+# Default configurations
+config_default:
+    telemetry_server:
+        host: 127.0.0.1
+        port: 6776
+        buffer_size: 664
+    telemetry_indexes:
+        rpm: 136
+        rpm_max: 999
+        speed: 60
+        gear: 44
+    
+# List of valid games
+# Note : each game must have custom code
+config_logger:
+    valid_game_names:
+        - 'Dirt Rally 1'
+        - 'Dirt Rally 2'
+        - 'Richard Burns Rally'
+        
+    # Game-specific configurations
+    game_dirt_rally_1:
+        telemetry_server:
+            host: 127.0.0.1
+            port: 20777
+            buffer_size: 664
+        telemetry_indexes:
+            rpm: 136
+            rpm_max: 999
+            speed: 60
+            gear: 44
+
+    game_dirt_rally_2:
+        telemetry_server:
+            host: 127.0.0.1
+            port: 6776
+            buffer_size: 664
+        telemetry_indexes:
+            rpm: 136
+            rpm_max: 999
+            speed: 60
+            gear: 44
+
+    game_richard_burns_rally:
+        telemetry_server:
+            host: 127.0.0.1
+            port: 6776
+            buffer_size: 664
+        telemetry_indexes:
+            rpm: 136
+            rpm_max: 999
+            speed: 60
+            gear: 44
