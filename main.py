@@ -447,54 +447,95 @@ class PanelDashboard(wx.Panel, object):
         # # # boxSizerDashboard.Add(rpmMeter, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         # # # # boxSizerDashboard.Add(speedMeter, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
         
+        # https://stackoverflow.com/questions/51141085/using-wxpython-speedmeter-within-a-panel
+        
         panel = wx.Panel(self, wx.ID_ANY)
         panel1 = wx.Panel(panel, wx.ID_ANY, style=wx.SUNKEN_BORDER)
+        
+    # Speedometer
+    #############
+        self.speedMeter = SM.SpeedMeter(panel1, -1, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS, size = (300,300), mousestyle=0)
 
-        self.speed = SM.SpeedMeter(panel1, -1, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS, size = (300,300), mousestyle=0)
-
-        self.speed.SetAngleRange(-pi/6, 7*pi/6)
+        self.speedMeter.SetAngleRange(-pi/6, 7*pi/6)
         intervals = range(0, 201, 20)
-        self.speed.SetIntervals(intervals)
+        self.speedMeter.SetIntervals(intervals)
         colours = [wx.BLACK]*10
-        self.speed.SetIntervalColours(colours)
+        self.speedMeter.SetIntervalColours(colours)
         ticks = [str(interval) for interval in intervals]
-        self.speed.SetTicks(ticks)
-        self.speed.SetTicksColour(wx.WHITE)
-        self.speed.SetNumberOfSecondaryTicks(5)
-        self.speed.SetTicksFont(wx.Font(7, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-        self.speed.SetMiddleText("RPM")
-        self.speed.SetMiddleTextColour(wx.WHITE)
-        self.speed.SetMiddleTextFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-        self.speed.SetHandColour(wx.Colour(255, 50, 0))
-        self.speed.DrawExternalArc(False)
-        self.speed.SetSpeedValue(44)
+        self.speedMeter.SetTicks(ticks)
+        self.speedMeter.SetTicksColour(wx.WHITE)
+        self.speedMeter.SetNumberOfSecondaryTicks(3)
+        self.speedMeter.SetTicksFont(wx.Font(7, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        self.speedMeter.SetMiddleText("Speed")
+        self.speedMeter.SetMiddleTextColour(wx.WHITE)
+        self.speedMeter.SetMiddleTextFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        self.speedMeter.SetHandColour(wx.Colour(255, 50, 0))
+        self.speedMeter.DrawExternalArc(False)
+        self.speedMeter.SetSpeedValue(44)
     #Bind mouse events
-        # self.speed.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)
-        # self.speed.SetToolTip(wx.ToolTip("Drag the speed dial to change the speed!"))
+        # self.speedMeter.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)
+        # self.speedMeter.SetToolTip(wx.ToolTip("Drag the speed dial to change the speed!"))
     #Define the control slider
-        self.slider = wx.Slider(panel1, -1, 44, 0, 200,
+        self.speedSlider = wx.Slider(panel1, -1, 44, 0, 200,
                            style=wx.SL_HORIZONTAL | wx.SL_AUTOTICKS | wx.SL_LABELS )
-        self.slider.SetTickFreq(5)
+        self.speedSlider.SetTickFreq(5)
     #Bind the slider
-        self.slider.Bind(wx.EVT_SCROLL, self.OnSliderScroll)
-        self.slider.SetToolTip(wx.ToolTip("Drag The Slider To Change The Speed!"))
+        self.speedSlider.Bind(wx.EVT_SCROLL, self.OnSpeedSliderScroll)
+        self.speedSlider.SetToolTip(wx.ToolTip("Drag The Slider To Change The Speed!"))
+        
+    # Rpmmeter
+    #############
+        self.rpmMeter = SM.SpeedMeter(panel1, -1, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS, size = (300,300), mousestyle=0)
+
+        self.rpmMeter.SetAngleRange(-pi/6, 7*pi/6)
+        intervals = range(0, 10001, 1000)
+        self.rpmMeter.SetIntervals(intervals)
+        colours = [wx.BLACK]*10
+        self.rpmMeter.SetIntervalColours(colours)
+        ticks = [str(interval) for interval in intervals]
+        self.rpmMeter.SetTicks(ticks)
+        self.rpmMeter.SetTicksColour(wx.WHITE)
+        self.rpmMeter.SetNumberOfSecondaryTicks(1)
+        self.rpmMeter.SetTicksFont(wx.Font(7, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        self.rpmMeter.SetMiddleText("RPM")
+        self.rpmMeter.SetMiddleTextColour(wx.WHITE)
+        self.rpmMeter.SetMiddleTextFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        self.rpmMeter.SetHandColour(wx.Colour(255, 50, 0))
+        self.rpmMeter.DrawExternalArc(False)
+        self.rpmMeter.SetSpeedValue(2500)
+    #Bind mouse events
+        # self.rpmMeter.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouserpmMeter)
+        # self.rpmMeter.SetToolTip(wx.ToolTip("Drag the speed dial to change the speed!"))
+    #Define the control slider
+        self.rpmSlider = wx.Slider(panel1, -1, 2500, 0, 10000,
+                           style=wx.SL_HORIZONTAL | wx.SL_AUTOTICKS | wx.SL_LABELS )
+        self.rpmSlider.SetTickFreq(5)
+    #Bind the slider
+        self.rpmSlider.Bind(wx.EVT_SCROLL, self.OnRpmSliderScroll)
+        self.rpmSlider.SetToolTip(wx.ToolTip("Drag The Slider To Change The Speed!"))
 
     #Create required sizers
+    #######################
         vsizer1 = wx.BoxSizer(wx.VERTICAL)
         hsizer1 = wx.BoxSizer(wx.HORIZONTAL)
 
-        hsizer1.Add(self.slider, 1, wx.EXPAND)
-        vsizer1.Add(self.speed, 0, wx.EXPAND)
+        hsizer1.Add(self.speedSlider, 1, wx.EXPAND)
+        vsizer1.Add(self.speedMeter, 0, wx.EXPAND)
         vsizer1.Add(hsizer1, 0, wx.EXPAND)
         
-        # vsizer2 = wx.BoxSizer(wx.VERTICAL)
-        # hsizer2 = wx.BoxSizer(wx.HORIZONTAL)
+        vsizer2 = wx.BoxSizer(wx.VERTICAL)
+        hsizer2 = wx.BoxSizer(wx.HORIZONTAL)
 
-        # hsizer2.Add(self.slider, 1, wx.EXPAND)
-        # vsizer2.Add(self.speed, 0, wx.EXPAND)
-        # vsizer2.Add(hsizer1, 0, wx.EXPAND)
+        hsizer2.Add(self.rpmSlider, 1, wx.EXPAND)
+        vsizer2.Add(self.rpmMeter, 0, wx.EXPAND)
+        vsizer2.Add(hsizer2, 0, wx.EXPAND)
+        
+        hsizermain = wx.BoxSizer(wx.HORIZONTAL)
+        hsizermain.Add(vsizer1, 1, wx.EXPAND)
+        hsizermain.Add(vsizer2, 1, wx.EXPAND)
     #Set the panel1 sizer
-        panel1.SetSizer(vsizer1)
+        # panel1.SetSizer(vsizer1)
+        panel1.SetSizer(hsizermain)
     #Fit contents
         panel1.Fit()
         
@@ -513,14 +554,24 @@ class PanelDashboard(wx.Panel, object):
         # # # self.SetSizer(boxSizerDashboard)
         # # # self.Layout()
 
-    def OnSliderScroll(self, event):
-        slider = event.GetEventObject()
-        self.speed.SetSpeedValue(slider.GetValue())
+    def OnSpeedSliderScroll(self, event):
+        speedSlider = event.GetEventObject()
+        self.speedMeter.SetSpeedValue(speedSlider.GetValue())
         event.Skip()
 
-    # def OnMouse(self, event):
-        # speed = event.GetEventObject()
-        # self.slider.SetValue(speed.GetSpeedValue())
+    # def OnMouseSpeedMeter(self, event):
+        # speedMeter = event.GetEventObject()
+        # self.speedSlider.SetValue(speedMeter.GetSpeedValue())
+        # event.Skip()
+    
+    def OnRpmSliderScroll(self, event):
+        rpmSlider = event.GetEventObject()
+        self.rpmMeter.SetSpeedValue(rpmSlider.GetValue())
+        event.Skip()
+
+    # def OnMouseRpmMeter(self, event):
+        # speedMeter = event.GetEventObject()
+        # self.rpmSlider.SetValue(rpmMeter.GetSpeedValue())
         # event.Skip()
 
 
