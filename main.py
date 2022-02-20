@@ -11,6 +11,7 @@ Following : https://wiki.wxpython.org/wxPython%20Style%20Guide
 # WX and inter-frame communication
 import wx
 import wx.lib.agw.speedmeter as SM
+import wx.lib.gizmos as gizmos
 from pubsub import pub
 
 # Serial communication
@@ -384,69 +385,6 @@ class PanelDashboard(wx.Panel, object):
 
         self.parent = parent
         
-        # # # # staticTextPlaceholder = wx.StaticText(self, label="Empty")
-        # # # rpmMeter = SM.SpeedMeter(self, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS);
-        # # # speedMeter = SM.SpeedMeter(self, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS);
-        
-        # # # # Set The Region Of Existence Of SpeedMeter (Always In Radians!!!!)
-        # # # rpmMeter.SetAngleRange(-pi/6, 7*pi/6)
-        # # # speedMeter.SetAngleRange(-pi/6, 7*pi/6)
-        
-        # # # # Create The Intervals That Will Divide Our SpeedMeter In Sectors
-        # # # intervals = range(0, 201, 20)
-        # # # rpmMeter.SetIntervals(intervals)
-        # # # speedMeter.SetIntervals(intervals)
-        
-        # # # # Assign The Same Colours To All Sectors (We Simulate A Car Control For Speed)
-        # # # # Usually This Is Black
-        # # # colours = [wx.BLACK]*10
-        # # # rpmMeter.SetIntervalColours(colours)
-        # # # speedMeter.SetIntervalColours(colours)
-        
-        # # # # Assign The Ticks: Here They Are Simply The String Equivalent Of The Intervals
-        # # # ticks = [str(interval) for interval in intervals]
-        # # # rpmMeter.SetTicks(ticks)
-        # # # speedMeter.SetTicks(ticks)
-        # # # # Set The Ticks/Tick Markers Colour
-        # # # rpmMeter.SetTicksColour(wx.WHITE)
-        # # # speedMeter.SetTicksColour(wx.WHITE)
-        # # # # We Want To Draw 5 Secondary Ticks Between The Principal Ticks
-        # # # rpmMeter.SetNumberOfSecondaryTicks(5)
-        # # # speedMeter.SetNumberOfSecondaryTicks(5)
-        
-        # # # # Set The Font For The Ticks Markers
-        # # # rpmMeter.SetTicksFont(wx.Font(7, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-        # # # speedMeter.SetTicksFont(wx.Font(7, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-        
-        # # # # Set The Text In The Center Of SpeedMeter
-        # # # rpmMeter.SetMiddleText("RPM")
-        # # # speedMeter.SetMiddleText("Km/h")
-        # # # # Assign The Colour To The Center Text
-        # # # rpmMeter.SetMiddleTextColour(wx.WHITE)
-        # # # speedMeter.SetMiddleTextColour(wx.WHITE)
-        # # # # Assign A Font To The Center Text
-        # # # rpmMeter.SetMiddleTextFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-        # # # speedMeter.SetMiddleTextFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-        
-        # # # # Set The Colour For The Hand Indicator
-        # # # rpmMeter.SetHandColour(wx.Colour(255, 50, 0))
-        # # # speedMeter.SetHandColour(wx.Colour(255, 50, 0))
-        
-        # # # # Do Not Draw The External (Container) Arc. Drawing The External Arc May
-        # # # # Sometimes Create Uglier Controls. Try To Comment This Line And See It
-        # # # # For Yourself!
-        # # # rpmMeter.DrawExternalArc(False)
-        # # # speedMeter.DrawExternalArc(False)
-        
-        # # # # Set The Current Value For The SpeedMeter
-        # # # rpmMeter.SetSpeedValue(44)
-        # # # speedMeter.SetSpeedValue(44)
-        
-        # # # boxSizerDashboard = wx.StaticBoxSizer(wx.VERTICAL, self, "Dashboard")
-        # # # # boxSizerDashboard.Add(staticTextPlaceholder, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
-        # # # boxSizerDashboard.Add(rpmMeter, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        # # # # boxSizerDashboard.Add(speedMeter, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
-        
         # https://stackoverflow.com/questions/51141085/using-wxpython-speedmeter-within-a-panel
         
         panel = wx.Panel(self, wx.ID_ANY)
@@ -513,9 +451,18 @@ class PanelDashboard(wx.Panel, object):
     #Bind the slider
         self.rpmSlider.Bind(wx.EVT_SCROLL, self.OnRpmSliderScroll)
         self.rpmSlider.SetToolTip(wx.ToolTip("Drag The Slider To Change The Speed!"))
-
-    #Create required sizers
-    #######################
+    
+    # Gear display
+    ##############
+        self.led = gizmos.LEDNumberCtrl(self, -1, (300,300), (25, 200),
+                              gizmos.LED_ALIGN_CENTER)# | gizmos.LED_DRAW_FADED)
+        self.led.SetForegroundColour('red')
+        self.led.SetBackgroundColour('black')
+        self.led.SetValue("1")
+    
+    # Create required sizers
+    ########################
+        # Speedometer sizer
         vsizer1 = wx.BoxSizer(wx.VERTICAL)
         hsizer1 = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -523,37 +470,35 @@ class PanelDashboard(wx.Panel, object):
         vsizer1.Add(self.speedMeter, 0, wx.EXPAND)
         vsizer1.Add(hsizer1, 0, wx.EXPAND)
         
+        # Gearbox display sizer
         vsizer2 = wx.BoxSizer(wx.VERTICAL)
-        hsizer2 = wx.BoxSizer(wx.HORIZONTAL)
-
-        hsizer2.Add(self.rpmSlider, 1, wx.EXPAND)
-        vsizer2.Add(self.rpmMeter, 0, wx.EXPAND)
-        vsizer2.Add(hsizer2, 0, wx.EXPAND)
+        vsizer2.Add(self.led, 0, wx.EXPAND)
         
+        # RPM meter sizer
+        vsizer3 = wx.BoxSizer(wx.VERTICAL)
+        hsizer3 = wx.BoxSizer(wx.HORIZONTAL)
+
+        hsizer3.Add(self.rpmSlider, 1, wx.EXPAND)
+        vsizer3.Add(self.rpmMeter, 0, wx.EXPAND)
+        vsizer3.Add(hsizer3, 0, wx.EXPAND)
+        
+        # Main dashboard sizer
         hsizermain = wx.BoxSizer(wx.HORIZONTAL)
         hsizermain.Add(vsizer1, 1, wx.EXPAND)
         hsizermain.Add(vsizer2, 1, wx.EXPAND)
-    #Set the panel1 sizer
+        hsizermain.Add(vsizer3, 1, wx.EXPAND)
+        #Set the panel1 sizer
         # panel1.SetSizer(vsizer1)
         panel1.SetSizer(hsizermain)
-    #Fit contents
+        #Fit contents
         panel1.Fit()
         
-    #Implement the main sizer
+        #Implement the main sizer
         mainSizer = wx.BoxSizer(wx.VERTICAL)
         mainSizer.Add(panel, 1, wx.EXPAND)
         self.SetSizer(mainSizer)
         mainSizer.Layout()
         
-        # # # boxSizerDashboard = wx.StaticBoxSizer(wx.VERTICAL, self, "Dashboard")
-        # # # # boxSizerDashboard.Add(staticTextPlaceholder, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
-        # # # boxSizerDashboard.Add(rpmMeter, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        # # # # boxSizerDashboard.Add(speedMeter, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
-        
-        ################################
-        # # # self.SetSizer(boxSizerDashboard)
-        # # # self.Layout()
-
     def OnSpeedSliderScroll(self, event):
         speedSlider = event.GetEventObject()
         self.speedMeter.SetSpeedValue(speedSlider.GetValue())
