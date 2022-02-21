@@ -51,7 +51,7 @@ version_string = '(Version 2.0.0, 2022-01-16)'
 ID_STARTLOG = 100
 
 # Global variables
-logger_stared = False
+logger_started = False
 
 logger_backend = LoggerBackend(debugging=debugging, log_raw_data=log_raw_data)
 
@@ -83,9 +83,10 @@ Enter:
 def udp_listen():
     global logger_backend
     
-    while logger_stared:
+    while logger_started:
         logger_backend.check_udp_messages()
-        print_current_state(logger_backend.get_game_state_str())
+        # print_current_state(logger_backend.get_game_state_str())
+        # TODO : replace with progress bar update
         
         msg = logger_backend.check_state_changes()
         if len(msg) > 0:
@@ -233,9 +234,12 @@ class PanelConsole(wx.Panel, object):
         # Subscribe to general config and console outputs
         pub.subscribe(self.sub_listener, "print_console")
         # pub.subscribe(self.sub_listener, "config_general")
+        
+        self.write_length = 0
     
     def write(self, text):
         self.consoleTextCtrl.AppendText(text)
+        self.write_length = len(text)
     
     def print_console(self, text):
         self.consoleTextCtrl.AppendText(text)
@@ -247,6 +251,10 @@ class PanelConsole(wx.Panel, object):
         """
         self.print_console(message)
         self.print_console("\n")
+        
+    def flush(self):
+        # self.consoleTextCtrl.flush()
+        self.consoleTextCtrl.Remove(self.consoleTextCtrl.GetLastPosition() - self.write_length, self.consoleTextCtrl.GetLastPosition())
 
 
 # ======================================================================================
@@ -288,7 +296,8 @@ class PanelLogger(wx.Panel, object):
         self.Layout()
         
         # Start logger thread
-        self.thread_udp = threading.Thread(target=udp_listen())
+        self.thread_udp = threading.Thread(target=udp_listen, daemon=True)
+        # pub.sendMessage("print_console", message="started udp_listen thread\n")
         
         # Subscribe to general config
         pub.subscribe(self.sub_listener, "config_general")
@@ -298,17 +307,17 @@ class PanelLogger(wx.Panel, object):
         def OnClickStartLogging(event):
             global logger_backend
             # Start / Stop DR2logger process
-            global logger_stared
-            if logger_stared==False:
+            global logger_started
+            if logger_started==False:
                 pub.sendMessage("print_console", message="Start logging")
-                logger_stared=True
+                logger_started=True
                 self.buttonStartLogging.SetLabel("Stop logging")
                 thread_dr2logger_init()
-                self.thread_udp.daemon = True
+                # self.thread_udp.daemon = True
                 self.thread_udp.start()
             else:
                 pub.sendMessage("print_console", message="Stop logging")
-                logger_stared=False
+                logger_started=False
                 self.buttonStartLogging.SetLabel("Start logging")
                 self.thread_udp.join()
                 logger_backend.end_logging()
@@ -454,11 +463,24 @@ class PanelDashboard(wx.Panel, object):
     
     # Gear display
     ##############
-        self.led = gizmos.LEDNumberCtrl(self, -1, (300,300), (25, 200),
+        self.gearLed = gizmos.LEDNumberCtrl(self, -1, (300,300), (25, 200),
                               gizmos.LED_ALIGN_CENTER)# | gizmos.LED_DRAW_FADED)
-        self.led.SetForegroundColour('red')
-        self.led.SetBackgroundColour('black')
-        self.led.SetValue("1")
+        self.gearLed.SetForegroundColour('red')
+        self.gearLed.SetBackgroundColour('black')
+        self.gearLed.SetValue("1")
+    
+    # Race time display
+    ###################
+        self.raceTimeLed = gizmos.LEDNumberCtrl(self, -1, (300,300), (25, 50),
+                              gizmos.LED_ALIGN_CENTER)# | gizmos.LED_DRAW_FADED)
+        self.raceTimeLed.SetForegroundColour('red')
+        self.raceTimeLed.SetBackgroundColour('black')
+        self.raceTimeLed.SetValue("00:00")
+        
+    # Track progress bar
+    ####################
+        self.progressBar = wx.Gauge(self, range=100, style=wx.GA_HORIZONTAL|wx.GA_TEXT)
+        self.progressBar.SetValue(0)
     
     # Create required sizers
     ########################
@@ -472,7 +494,9 @@ class PanelDashboard(wx.Panel, object):
         
         # Gearbox display sizer
         vsizer2 = wx.BoxSizer(wx.VERTICAL)
-        vsizer2.Add(self.led, 0, wx.EXPAND)
+        vsizer2.Add(self.gearLed, 0, wx.EXPAND)
+        vsizer2.Add(self.raceTimeLed, 0, wx.EXPAND)
+        vsizer2.Add(self.progressBar, 0, wx.EXPAND)
         
         # RPM meter sizer
         vsizer3 = wx.BoxSizer(wx.VERTICAL)
@@ -499,6 +523,12 @@ class PanelDashboard(wx.Panel, object):
         self.SetSizer(mainSizer)
         mainSizer.Layout()
         
+        pub.subscribe(self.sub_listener_track_progress, "telemetry_track_progress")
+        pub.subscribe(self.sub_listener_track_duration, "telemetry_track_duration")
+        pub.subscribe(self.sub_listener_gear, "telemetry_gear")
+        pub.subscribe(self.sub_listener_speed, "telemetry_speed")
+        pub.subscribe(self.sub_listener_rpm, "telemetry_rpm")
+        
     def OnSpeedSliderScroll(self, event):
         speedSlider = event.GetEventObject()
         self.speedMeter.SetSpeedValue(speedSlider.GetValue())
@@ -518,6 +548,21 @@ class PanelDashboard(wx.Panel, object):
         # speedMeter = event.GetEventObject()
         # self.rpmSlider.SetValue(rpmMeter.GetSpeedValue())
         # event.Skip()
+    
+    def sub_listener_track_progress(self, message):
+        self.progressBar.SetValue(int(message * 100))
+    
+    def sub_listener_track_duration(self, message):
+        self.raceTimeLed.SetValue(message)
+        
+    def sub_listener_gear(self, message):
+        self.gearLed.SetValue(str(int(message)))
+        
+    def sub_listener_rpm(self, message):
+        self.rpmMeter.SetSpeedValue(message)
+        
+    def sub_listener_speed(self, message):
+        self.speedMeter.SetSpeedValue(message)
 
 
 # ======================================================================================
@@ -700,9 +745,12 @@ if __name__ == '__main__':
     
     # Overload print to redirect stdout to the console panel
     """https://stackoverflow.com/questions/550470/overload-print-python"""
+    
     old_stdout = sys.stdout
     new_stdout = frm.PanelConsole
     sys.stdout = new_stdout
+    
+    
     
     app.MainLoop()
     

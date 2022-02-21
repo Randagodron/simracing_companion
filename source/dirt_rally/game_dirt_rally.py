@@ -197,6 +197,24 @@ class GameDirtRally(GameBase):
                     f.write('[{}, {}, \'Unknown track\'],\n'.format(length, start_z))
         return track_name
 
+    def get_rpm(self, session_collection):
+        if session_collection.shape[1] == 0:
+            return 0.0
+        else:
+            return session_collection[udp_data.Fields.rpm.value, -1]
+    
+    def get_speed(self, session_collection):
+        if session_collection.shape[1] == 0:
+            return 0.0
+        else:
+            return session_collection[udp_data.Fields.speed_ms.value, -1]
+    
+    def get_gear(self, session_collection):
+        if session_collection.shape[1] == 0:
+            return 0
+        else:
+            return session_collection[udp_data.Fields.gear.value, -1]
+
     @staticmethod
     def get_run_time_cleaned(run_time_raw: np.ndarray):
         if run_time_raw.shape[0] == 0:

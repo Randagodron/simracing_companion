@@ -3,6 +3,7 @@ import os
 import sys
 import traceback
 from enum import Enum
+from pubsub import pub
 
 from source import networking
 from source import utils
@@ -155,6 +156,7 @@ class LoggerBackend:
                 print('"{}" is no valid file!'.format(file_path))
 
     def get_game_state_str(self):
+        """Returns a string containing the state of the game (progress, time ...)"""
         return self.game.get_game_state_str(self.new_state, self.last_sample, self.session_collection.shape[1])
 
     def get_num_samples(self):
@@ -227,6 +229,7 @@ class LoggerBackend:
                     self.session_collection = np.append(self.session_collection,
                                                         np.expand_dims(self.receive_results, 1), axis=1)
         else:
+            # print('test')
             self.new_state = self.last_state
             self.has_new_data = False
 
@@ -248,6 +251,7 @@ class LoggerBackend:
                 print('Error was caught, logger is still running...')
 
     def check_state_changes(self):
+        """Updates game state, get state string for display"""
         message = []
 
         if self.debugging and self.last_state != self.new_state:
@@ -255,9 +259,16 @@ class LoggerBackend:
 
         if self.last_state == GameState.race_running and \
                 self.new_state == GameState.race_running:
-            game_state_str = self.get_game_state_str()
-            sys.stdout.write('\r' + game_state_str),
-            sys.stdout.flush()
+            #game_state_str = self.get_game_state_str()
+            # sys.stdout.write('\r' + game_state_str),
+            # sys.stdout.flush()
+            # pub.sendMessage("print_console", message=str(self.game.get_progress(self.session_collection)))
+            # pub.sendMessage("print_console", message=str(self.new_state))
+            pub.sendMessage("telemetry_track_progress", message=self.game.get_progress(self.session_collection))
+            # pub.sendMessage("logger_track_duration", message=int(self.game.get_race_duration(self.session_collection)))
+            pub.sendMessage("telemetry_speed", message=(self.game.get_speed(self.session_collection) * 5.0))
+            pub.sendMessage("telemetry_rpm", message=(self.game.get_rpm(self.session_collection) * 10.0))
+            pub.sendMessage("telemetry_gear", message=self.game.get_gear(self.session_collection))
 
         # simply ignore state changes through duplicates
         if self.new_state == GameState.ignore_package:
@@ -265,8 +276,8 @@ class LoggerBackend:
 
         if self.last_state == GameState.race_running and \
                 self.new_state == GameState.race_not_running:
-            sys.stdout.write('\n')
-            sys.stdout.flush()
+            # sys.stdout.write('\n')
+            # sys.stdout.flush()
 
             race_duration = self.game.get_race_duration(self.session_collection)
             if race_duration > 10.0:  # only save if more than 10 sec of race time
