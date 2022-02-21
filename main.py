@@ -266,7 +266,7 @@ class PanelLogger(wx.Panel, object):
 
         self.parent = parent
         
-        listGame        = wx.Choice(self, choices=["DiRT 1", "DiRT 2.0", "Richard Burns Rally"])
+        self.listGame        = wx.Choice(self, choices=["Dirt_Rally_1", "Dirt_Rally_2", "Richard Burns Rally"])
         buttonClearRun  = wx.Button(self, label="Clear run", size=wx.Size(100, 32))
         buttonPlot      = wx.Button(self, label="Plot", size=wx.Size(100, 32))
         buttonPlotAll   = wx.Button(self, label="PlotAll", size=wx.Size(100, 32))
@@ -274,9 +274,11 @@ class PanelLogger(wx.Panel, object):
         buttonLoad      = wx.Button(self, label="Load", size=wx.Size(100, 32))
         
         self.buttonStartLogging     = wx.Button(self, label="Start logging", size=wx.Size(100, 32))
+        self.buttonStartLogging.SetBackgroundColour('green')
+        self.buttonStartLogging.Disable()
         
         boxSizerLogger = wx.StaticBoxSizer(wx.VERTICAL, self, "Logger")
-        boxSizerLogger.Add(listGame, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerLogger.Add(self.listGame, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         boxSizerLogger.Add(self.buttonStartLogging, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         boxSizerLogger.Add(buttonClearRun, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         boxSizerLogger.Add(buttonPlot, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
@@ -290,7 +292,7 @@ class PanelLogger(wx.Panel, object):
         buttonPlotAll.Bind(wx.EVT_BUTTON, self.getOnClickPlotAll())
         buttonSave.Bind(wx.EVT_BUTTON, self.getOnClickSave())
         buttonLoad.Bind(wx.EVT_BUTTON, self.getOnClickLoad())
-        listGame.Bind(wx.EVT_CHOICE, self.getOnSelectGame())
+        self.listGame.Bind(wx.EVT_CHOICE, self.getOnSelectGame())
         
         self.SetSizer(boxSizerLogger)
         self.Layout()
@@ -312,6 +314,7 @@ class PanelLogger(wx.Panel, object):
                 pub.sendMessage("print_console", message="Start logging")
                 logger_started=True
                 self.buttonStartLogging.SetLabel("Stop logging")
+                self.buttonStartLogging.SetBackgroundColour('red')
                 thread_dr2logger_init()
                 # self.thread_udp.daemon = True
                 self.thread_udp.start()
@@ -319,6 +322,7 @@ class PanelLogger(wx.Panel, object):
                 pub.sendMessage("print_console", message="Stop logging")
                 logger_started=False
                 self.buttonStartLogging.SetLabel("Start logging")
+                self.buttonStartLogging.SetBackgroundColour('green')
                 self.thread_udp.join()
                 logger_backend.end_logging()
         return OnClickStartLogging
@@ -374,8 +378,10 @@ class PanelLogger(wx.Panel, object):
             # print("Game selected") # DEBUG
             pub.sendMessage("print_console", message="Game selected")
             # new_game_name = command.split(' ')[1]
-            # logger_backend.change_game(new_game_name)
-            # print('Switched game to "{}"'.format(logger_backend.game_name))
+            new_game_name = self.listGame.GetString(self.listGame.GetCurrentSelection())
+            logger_backend.change_game(new_game_name)
+            print('Switched game to "{}"'.format(logger_backend.game_name))
+            self.buttonStartLogging.Enable()
         return OnSelectGame
         
     def sub_listener(self, message):
@@ -553,10 +559,15 @@ class PanelDashboard(wx.Panel, object):
         self.progressBar.SetValue(int(message * 100))
     
     def sub_listener_track_duration(self, message):
-        self.raceTimeLed.SetValue(message)
+        sec = message % 60
+        min = int(message / 60)
+        self.raceTimeLed.SetValue("{:0>2d}".format(min) + ':' + "{:0>2d}".format(sec))
         
     def sub_listener_gear(self, message):
-        self.gearLed.SetValue(str(int(message)))
+        if (int(message) == 10):
+            self.gearLed.SetValue(str(9))
+        else:
+            self.gearLed.SetValue(str(int(message)))
         
     def sub_listener_rpm(self, message):
         self.rpmMeter.SetSpeedValue(message)

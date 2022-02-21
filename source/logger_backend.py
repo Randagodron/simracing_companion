@@ -265,7 +265,7 @@ class LoggerBackend:
             # pub.sendMessage("print_console", message=str(self.game.get_progress(self.session_collection)))
             # pub.sendMessage("print_console", message=str(self.new_state))
             pub.sendMessage("telemetry_track_progress", message=self.game.get_progress(self.session_collection))
-            # pub.sendMessage("logger_track_duration", message=int(self.game.get_race_duration(self.session_collection)))
+            pub.sendMessage("telemetry_track_duration", message=int(self.game.get_race_duration(self.session_collection)))
             pub.sendMessage("telemetry_speed", message=(self.game.get_speed(self.session_collection) * 5.0))
             pub.sendMessage("telemetry_rpm", message=(self.game.get_rpm(self.session_collection) * 10.0))
             pub.sendMessage("telemetry_gear", message=self.game.get_gear(self.session_collection))
