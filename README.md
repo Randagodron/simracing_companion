@@ -25,7 +25,15 @@ Usage
 
 Run:
 
-`python3 main.py
+    python3 main.py
+
+Upper-left : serial module, manages the serial communication. The drop-down menu contains the list of detected serial devices. "Connect" button initiates the connection to the selected device. The value selector changes the UART message sending periodicity (in milliseconds). The "Test" button allows automatic sending of random values for test purposes.
+
+Upper-right : console output.
+
+Lower-left : Logger controls (main menu of dr2_loger).
+
+Lower-right : dash display, shows SPeed, RPMs, gear, track progress, time in seconds. RPM meter automatically scales according to the max_rpm value received from the game.
 
 Architecture
 ------------
