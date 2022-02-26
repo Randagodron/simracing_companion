@@ -159,18 +159,13 @@ class PanelSerial(wx.Panel, object):
         self.buttonConnect.SetBackgroundColour('green')
         self.buttonConnect.Bind(wx.EVT_BUTTON, self.getOnClickPortsConnect(ports_list, listSerialPorts.GetCurrentSelection()))
         
-        # DEBUG
-        buttonTest     = wx.Button(self, label="Test", size=wx.Size(100, 32))
-        buttonTest.Bind(wx.EVT_BUTTON, self.getOnClickTest())
+        
         
         boxSizerSerial = wx.StaticBoxSizer(wx.VERTICAL, self, "Serial communication")
         boxSizerSerial.Add(listSerialPorts, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         boxSizerSerial.Add(buttonRefresh, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         boxSizerSerial.Add(self.buttonConnect, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        #DEBUG
-        boxSizerSerial.Add(buttonTest, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         
-        # self.SetSizer(sizer)
         self.SetSizer(boxSizerSerial)
         self.Layout()
         
@@ -214,11 +209,7 @@ class PanelSerial(wx.Panel, object):
             
         return OnClickPortsConnect
         
-    def getOnClickTest(self):
-        def OnClickTest(event):
-            pub.sendMessage("serial_tx", message=struct.pack('>cHHchcB', bytes('R', "utf-8"), int(random.randint(100, 8000)), 8000, bytes('S', "utf-8"), int(random.randint(1, 180)), bytes('G', "utf-8"), int(random.randint(1, 7)))) # DEBUG
-            # pub.sendMessage("serial_tx", message=struct.pack('>cHH', bytes('R', "utf-8"), 5500, 8000)) # DEBUG
-        return OnClickTest
+    
         
     """https://stackoverflow.com/questions/173687/is-it-possible-to-pass-arguments-into-event-bindings"""
     def getOnSelectSerial(self, list_serial_ports):
@@ -253,7 +244,7 @@ class PanelSerial(wx.Panel, object):
         """
         Send data to serial port
         """
-        if self.ser.is_open:
+        if self.port_open:
             self.ser.write(message)
             # print(message) # DEBUG
         else:
@@ -262,12 +253,18 @@ class PanelSerial(wx.Panel, object):
 
 class PanelDeviceCommunication(wx.Panel, object):
 # ======================================================================================
-    """Device Communication (DCM) panel - Parses received serial messages, construct sent serial messages"""
+    """Device Communication Module (DCM) panel - Parses received serial messages, construct sent serial messages"""
     def __init__(self, parent, *args, **kwargs):
         """Create the PanelDeviceCommunication."""
         wx.Panel.__init__(self, parent, *args, **kwargs)
 
         self.parent = parent
+        
+        self.Bind(wx.EVT_CLOSE, self.OnClosePanel)
+        
+        self.periodic_send_enable = True
+        self.timer_send_period = 0.1
+        self.test_enable = False
         
         # self.speed_modifier = speed_units == 'mph' and 0.6214 or 1
         self.speed_modifier = 1
@@ -293,29 +290,88 @@ class PanelDeviceCommunication(wx.Panel, object):
         pub.subscribe(self.sub_listener_speed, "telemetry_speed")
         pub.subscribe(self.sub_listener_rpm, "telemetry_rpm")
         
-    def serial_send(self, data):
-        self.ser.write(struct.pack('>cHHchcB', 'R', self.data['rpm'], self.data['max_rpm'], 'S', self.data['speed'], 'G', self.data['gear']))
+        # Control for communication periodicity
+        self.controlCommunicationPeriod = wx.SpinCtrl(self, size=wx.Size(50, 20), min=0, max=1000, initial=800)
+        self.controlCommunicationPeriod.Bind(wx.EVT_SPINCTRL, self.getOnPeriodChange())
+        
+        # DEBUG
+        self.buttonTest     = wx.Button(self, label="Test", size=wx.Size(100, 32))
+        self.buttonTest.SetBackgroundColour('green')
+        self.buttonTest.Bind(wx.EVT_BUTTON, self.getOnClickTest())
+        
+        boxSizerDCM = wx.StaticBoxSizer(wx.VERTICAL, self, "Device Communication Module")
+        boxSizerDCM.Add(self.controlCommunicationPeriod, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        #DEBUG
+        boxSizerDCM.Add(self.buttonTest, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        
+        self.SetSizer(boxSizerDCM)
+        self.Layout()
+        
+        self.timer_send_period = self.controlCommunicationPeriod.GetValue() / 1000.0
+        
+        # Start cyclic thread for serial communication
+        self.thread_lock = threading.Lock()
+        self.serial_send_thread_timer = threading.Timer(self.timer_send_period, self.serial_send)
+        self.serial_send_thread_timer.start()
+        pub.sendMessage("print_console", message="Periodic serial communication thread started with period %d" % (self.controlCommunicationPeriod.GetValue()))
+    
+    def OnClosePanel(self, event):
+        self.serial_send_thread_timer.cancel()
+        print("Closing communication")
+        self.Destroy()
+    
+    def getOnClickTest(self):
+        def OnClickTest(event):
+            if self.test_enable :
+                # Disable test sends
+                self.test_enable = False
+                self.buttonTest.SetBackgroundColour('green')
+                self.buttonTest.SetLabel('Test')
+                print("Stopping test messages")
+            else:
+                self.test_enable = True
+                self.buttonTest.SetBackgroundColour('red')
+                self.buttonTest.SetLabel('Test stop')
+                print("Starting test messages")
+                
+            # pub.sendMessage("serial_tx", message=struct.pack('>cHHchcB', bytes('R', "utf-8"), int(random.randint(100, 8000)), 8000, bytes('S', "utf-8"), int(random.randint(1, 180)), bytes('G', "utf-8"), random.choice([0,1,2,3,4,5,6,7,10]))) # DEBUG
+        return OnClickTest
+        
+    def getOnPeriodChange(self):
+        def OnPeriodChange(event):
+            self.timer_send_period = self.controlCommunicationPeriod.GetValue() / 1000.0
+            pass
+        return OnPeriodChange
+        
+    def serial_send(self):
+        # TODO : add check that the port exists and is opened
+        if self.test_enable :
+            pub.sendMessage("serial_tx", message=struct.pack('>cHHchcB', bytes('R', "utf-8"), random.randint(100, 8000), 8000, bytes('S', "utf-8"), random.randint(1, 180), bytes('G', "utf-8"), random.choice([0,1,2,3,4,5,6,7,10])))
+ # DEBUG
+        else :
+            pub.sendMessage("serial_tx", message=struct.pack('>cHHchcB', bytes('R', "utf-8"), self.data['rpm'], self.data['max_rpm'], bytes('S', "utf-8"), self.data['speed'], bytes('G', "utf-8"), self.data['gear']))
+        
+        # print("serial_send") # DEBUG
+        
+        with self.thread_lock:
+            if self.periodic_send_enable:
+                self.serial_send_thread_timer = threading.Timer(self.timer_send_period, self.serial_send)
+                self.serial_send_thread_timer.start() # Restart timer
+            else:
+                self.serial_send_thread_timer.cancel()
         
     def sub_listener_gear(self, message):
         if (int(message) == 10):
-            # self.gearLed.SetValue(str(9))
             self.gear = 9
-            # pass
         else:
-            # self.gearLed.SetValue(str(int(message)))
             self.gear = int(message)
-            # pass
     
     def sub_listener_rpm(self, message):
-        # self.rpmMeter.SetSpeedValue(message)
-        # pass
         self.rpm = int(message)
         
     def sub_listener_speed(self, message):
-        # self.speedMeter.SetSpeedValue(message)
-        # pass
         self.speed = int(message)
-
+        
 
 # ======================================================================================
 class PanelConsole(wx.Panel, object):
@@ -713,8 +769,13 @@ class MainFrame(wx.Frame):
         # Add Dashboard panel
         self.PanelDashboard = PanelDashboard(self)
         
+        # Add CMD panel
+        self.PanelDeviceCommunication = PanelDeviceCommunication(self)
+        
         # vbox.Add(self.PanelSerial, 0, wx.EXPAND | wx.UP, 5)
         # vbox.Add(self.PanelConsole, 1, wx.EXPAND)
+        vbox.Add(self.PanelSerial, 0, wx.EXPAND | wx.UP, 5)
+        vbox.Add(self.PanelDeviceCommunication, 1, wx.EXPAND)
         # vbox.Add((3, -1))
         
         # panel.SetSizer(vbox)
@@ -725,7 +786,8 @@ class MainFrame(wx.Frame):
         """https://discuss.wxpython.org/t/help-with-paintevents-and-displaying-multiple-panels/34913"""
         self.main_ui_grid_sizer = wx.GridBagSizer(vgap = 0, hgap = 0)
         # self.main_ui_grid_sizer.Add(self.PanelSerial, pos=(0,0), flag=wx.EXPAND)
-        self.main_ui_grid_sizer.Add(self.PanelSerial, pos=(0,0))
+        # self.main_ui_grid_sizer.Add(self.PanelSerial, pos=(0,0))
+        self.main_ui_grid_sizer.Add(vbox, pos=(0,0))
         self.main_ui_grid_sizer.Add(self.PanelConsole, pos=(0,1), flag=wx.EXPAND)
         self.main_ui_grid_sizer.Add(self.PanelLogger, pos=(1,0), flag=wx.EXPAND)
         self.main_ui_grid_sizer.Add(self.PanelDashboard, pos=(1,1), flag=wx.EXPAND)
@@ -779,10 +841,16 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnLoadConfig, loadConfigItem)
         self.Bind(wx.EVT_MENU, self.OnExit,  exitItem)
         self.Bind(wx.EVT_MENU, self.OnAbout, aboutItem)
+        self.Bind(wx.EVT_CLOSE, self.OnCloseFrame)
 
     def OnExit(self, event):
         """Close the frame, terminating the application."""
         self.Close(True)
+    
+    def OnCloseFrame(self, event):
+        """Function bound to the close event"""
+        self.PanelDeviceCommunication.Close()
+        self.Destroy()
 
     def OnHello(self, event):
         """Say hello to the user."""
