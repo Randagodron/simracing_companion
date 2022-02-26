@@ -29,9 +29,6 @@ import queue
 import yaml
 import os.path
 
-# For stdout redirecting
-# from contextlib import redirect_stdout
-
 # Misc. imports
 from math import pi, sqrt
 import struct
@@ -87,9 +84,6 @@ def udp_listen():
     
     while logger_started:
         logger_backend.check_udp_messages()
-        # print_current_state(logger_backend.get_game_state_str())
-        # TODO : replace with progress bar update
-        
         msg = logger_backend.check_state_changes()
         if len(msg) > 0:
             pub.sendMessage("print_console", message=msg)
@@ -147,9 +141,6 @@ class PanelSerial(wx.Panel, object):
         # Scan for COM ports
         self.scan_com_ports(ports, ports_list, ports_description_list)
         
-        # print(ports_description_list) # DEBUG
-        # pub.sendMessage("print_console", message=', '.join(ports_description_list)) # DEBUG
-        
         buttonRefresh     = wx.Button(self, label="Refresh", size=wx.Size(100, 32))
         buttonRefresh.Bind(wx.EVT_BUTTON, self.OnClickPortsRefresh)
         
@@ -179,6 +170,7 @@ class PanelSerial(wx.Panel, object):
         pub.subscribe(self.sub_listener_send, "serial_tx")
     
     def OnClickPortsRefresh(self, event):
+        # TODO
         # self.scan_com_ports()
         # print("Refresh\n") # DEBUG
         # pub.sendMessage("print_console", message="Refresh") # DEBUG
@@ -203,10 +195,7 @@ class PanelSerial(wx.Panel, object):
                 self.buttonConnect.SetBackgroundColour('green')
                 self.buttonConnect.SetLabel('Connect')
             else:
-                # pub.sendMessage("print_console", message="Ports connect") # DEBUG
                 self.ser = serial.Serial(ports_list[port_current_selection], 115200)
-                # self.ser.open() # Useless, port is automatically opened upon creation
-                # print(self.ser.name) # DEBUG
                 
                 if self.ser.is_open: # Check if port was successfully opened
                     self.port_open = True
@@ -218,9 +207,6 @@ class PanelSerial(wx.Panel, object):
                     pub.sendMessage("print_console", message="Error while opening serial port !")
                     self.buttonConnect.SetBackgroundColour('green')
                     self.buttonConnect.SetLabel('Connect')
-                    
-                # pub.sendMessage("print_console", message=self.ser.name) # DEBUG
-            
         return OnClickPortsConnect
         
     
@@ -228,24 +214,17 @@ class PanelSerial(wx.Panel, object):
     """https://stackoverflow.com/questions/173687/is-it-possible-to-pass-arguments-into-event-bindings"""
     def getOnSelectSerial(self, list_serial_ports):
         def OnSelectSerial(event):
-            # pub.sendMessage("print_console", message="Port selected") # DEBUG
-            # print("Serial port selected : %d\n" % list_serial_ports.GetCurrentSelection()) # DEBUG
             pub.sendMessage("print_console", message="Serial port selected : %d\n" % (list_serial_ports.GetCurrentSelection()))
-            # pub.sendMessage("print_console", message="Serial port selected : %d - %s\n" % (list_serial_ports.GetCurrentSelection(), list_serial_ports[list_serial_ports.GetCurrentSelection()].device % " - " % list_serial_ports[list_serial_ports.GetCurrentSelection()].description))
         return OnSelectSerial
     
     def scan_com_ports(self, ports, ports_list, ports_description_list):
         """
         Scans the available COM ports, creates a list and fills the corresponding wx.choice
         """
-        # self.consoleTextCtrl.AppendText("Searching for COM ports ...\n")
-        # print("Searching for COM ports ...\n") # DEBUG
         pub.sendMessage("print_console", message="Searching for COM ports ...\n")
         for port in ports :
             ports_list.append(port.device) # Get port reference
             ports_description_list.append(port.device + " - " + port.description) # Construct a description for the GUI list
-            # self.consoleTextCtrl.AppendText("COM port found : %s\n" % (port.device + " - " + port.description))
-            # print("COM port found : %s\n" % (port.device + " - " + port.description)) # DEBUG
             pub.sendMessage("print_console", message="COM port found : %s\n" % (port.device + " - " + port.description))
             
     def sub_listener(self, message):
@@ -260,7 +239,6 @@ class PanelSerial(wx.Panel, object):
         """
         if self.port_open:
             self.ser.write(message)
-            # print(message) # DEBUG
         else:
             pass
 
@@ -288,14 +266,9 @@ class PanelDeviceCommunication(wx.Panel, object):
         self.rpm = 0
         self.max_rpm = 10000
         self.data = {
-        # 'speed': int(stats[7] * 3.6 * self.speed_modifier),
-        # 'speed': int(speed * 3.6 * self.speed_modifier),
         'speed': int(self.speed * self.speed_modifier),
-        # 'gear': int(stats[33]),
         'gear': int(self.gear),
-        # 'rpm': int(stats[37] * 10),
         'rpm': int(self.rpm),
-        # 'max_rpm': int(stats[63] * 10)
         'max_rpm': int(self.max_rpm)
         }
         
@@ -347,8 +320,6 @@ class PanelDeviceCommunication(wx.Panel, object):
                 self.buttonTest.SetBackgroundColour('red')
                 self.buttonTest.SetLabel('Test stop')
                 print("Starting test messages")
-                
-            # pub.sendMessage("serial_tx", message=struct.pack('>cHHchcB', bytes('R', "utf-8"), int(random.randint(100, 8000)), 8000, bytes('S', "utf-8"), int(random.randint(1, 180)), bytes('G', "utf-8"), random.choice([0,1,2,3,4,5,6,7,10]))) # DEBUG
         return OnClickTest
         
     def getOnPeriodChange(self):
@@ -364,7 +335,6 @@ class PanelDeviceCommunication(wx.Panel, object):
  # DEBUG
         else :
             pub.sendMessage("serial_tx", message= struct.pack('>cHHchcB', bytes('R', "utf-8"), self.rpm, self.max_rpm, bytes('S', "utf-8"), self.speed, bytes('G', "utf-8"), self.gear))
-            # print(struct.pack('>cHHchcB', bytes('R', "utf-8"), self.rpm, self.max_rpm, bytes('S', "utf-8"), self.speed, bytes('G', "utf-8"), self.gear)) # DEBUG
         
         with self.thread_lock:
             if self.periodic_send_enable:
@@ -406,7 +376,6 @@ class PanelConsole(wx.Panel, object):
         
         # Subscribe to general config and console outputs
         pub.subscribe(self.sub_listener, "print_console")
-        # pub.subscribe(self.sub_listener, "config_general")
         
         self.write_length = 0
     
@@ -439,7 +408,7 @@ class PanelLogger(wx.Panel, object):
 
         self.parent = parent
         
-        self.listGame        = wx.Choice(self, choices=["Dirt_Rally_1", "Dirt_Rally_2", "Richard Burns Rally"])
+        self.listGame   = wx.Choice(self, choices=LoggerBackend.get_all_valid_games())
         buttonClearRun  = wx.Button(self, label="Clear run", size=wx.Size(100, 32))
         buttonPlot      = wx.Button(self, label="Plot", size=wx.Size(100, 32))
         buttonPlotAll   = wx.Button(self, label="PlotAll", size=wx.Size(100, 32))
@@ -472,7 +441,6 @@ class PanelLogger(wx.Panel, object):
         
         # Start logger thread
         self.thread_udp = threading.Thread(target=udp_listen, daemon=True)
-        # pub.sendMessage("print_console", message="started udp_listen thread\n")
         
         # Subscribe to general config
         pub.subscribe(self.sub_listener, "config_general")
@@ -489,7 +457,6 @@ class PanelLogger(wx.Panel, object):
                 self.buttonStartLogging.SetLabel("Stop logging")
                 self.buttonStartLogging.SetBackgroundColour('red')
                 thread_dr2logger_init()
-                # self.thread_udp.daemon = True
                 self.thread_udp.start()
             else:
                 pub.sendMessage("print_console", message="Stop logging")
@@ -503,15 +470,12 @@ class PanelLogger(wx.Panel, object):
     def getOnClickClearRun(self):
         def OnClickClearRun(event):
             global logger_backend
-            # print("Clear run") # DEBUG
-            # pub.sendMessage("print_console", message="Clear run")
             pub.sendMessage("print_console", message='Cleared {} data points\n'.format(logger_backend.get_num_samples()))
             logger_backend.clear_session_collection()
         return OnClickClearRun
     
     def getOnClickPlot(self):
         def OnClickPlot(event):
-            # print("Plot") # DEBUG
             pub.sendMessage("print_console", message="Plot")
             if logger_backend.get_num_samples() == 0:
                 pub.sendMessage("print_console", message='No data points to plot\n')
@@ -522,7 +486,6 @@ class PanelLogger(wx.Panel, object):
     
     def getOnClickPlotAll(self):
         def OnClickPlotAll(event):
-            # print("Plot all") # DEBUG
             pub.sendMessage("print_console", message="PlotAll")
             if logger_backend.get_num_samples() == 0:
                 pub.sendMessage("print_console", message='No data points to plot\n')
@@ -533,14 +496,12 @@ class PanelLogger(wx.Panel, object):
     
     def getOnClickSave(self):
         def OnClickSave(event):
-            # print("Save") # DEBUG
             pub.sendMessage("print_console", message="Save")
             logger_backend.save_run()
         return OnClickSave
     
     def getOnClickLoad(self):
         def OnClickLoad(event):
-            # print("Load") # DEBUG
             pub.sendMessage("print_console", message="Load")
             logger_backend.load_run()
             print_current_state(logger_backend.get_game_state_str())
@@ -548,9 +509,7 @@ class PanelLogger(wx.Panel, object):
     
     def getOnSelectGame(self):
         def OnSelectGame(event):
-            # print("Game selected") # DEBUG
             pub.sendMessage("print_console", message="Game selected")
-            # new_game_name = command.split(' ')[1]
             new_game_name = self.listGame.GetString(self.listGame.GetCurrentSelection())
             logger_backend.change_game(new_game_name)
             print('Switched game to "{}"'.format(logger_backend.game_name))
@@ -598,16 +557,6 @@ class PanelDashboard(wx.Panel, object):
         self.speedMeter.SetHandColour(wx.Colour(255, 50, 0))
         self.speedMeter.DrawExternalArc(False)
         self.speedMeter.SetSpeedValue(44)
-    #Bind mouse events
-        # self.speedMeter.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)
-        # self.speedMeter.SetToolTip(wx.ToolTip("Drag the speed dial to change the speed!"))
-    #Define the control slider
-        self.speedSlider = wx.Slider(panel1, -1, 44, 0, 200,
-                           style=wx.SL_HORIZONTAL | wx.SL_AUTOTICKS | wx.SL_LABELS )
-        self.speedSlider.SetTickFreq(5)
-    #Bind the slider
-        self.speedSlider.Bind(wx.EVT_SCROLL, self.OnSpeedSliderScroll)
-        self.speedSlider.SetToolTip(wx.ToolTip("Drag The Slider To Change The Speed!"))
         
     # Rpmmeter
     #############
@@ -615,34 +564,14 @@ class PanelDashboard(wx.Panel, object):
         self.rpm_max_meter = 10000
         self.rpmMeter = SM.SpeedMeter(panel1, -1, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS, size = (300,300), mousestyle=0)
 
-        # self.rpmMeter.SetAngleRange(-pi/6, 7*pi/6)
-        # intervals = range(0, int(self.rpm_max + 1), int(self.rpm_max / 10))
-        # self.rpmMeter.SetIntervals(intervals)
-        # colours = [wx.BLACK]*10
-        # self.rpmMeter.SetIntervalColours(colours)
-        # ticks = [str(interval) for interval in intervals]
-        # self.rpmMeter.SetTicks(ticks)
-        # self.rpmMeter.SetTicksColour(wx.WHITE)
-        # self.rpmMeter.SetNumberOfSecondaryTicks(1)
         self.rpmMeter.SetTicksFont(wx.Font(7, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
         self.rpmMeter.SetMiddleText("RPM")
         self.rpmMeter.SetMiddleTextColour(wx.WHITE)
         self.rpmMeter.SetMiddleTextFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
         self.rpmMeter.SetHandColour(wx.Colour(255, 50, 0))
-        # self.rpmMeter.DrawExternalArc(False)
         
-        self.RpmSliderConfig(self.rpm_max)
+        self.RpmMeterConfig(self.rpm_max)
         self.rpmMeter.SetSpeedValue(2500)
-    #Bind mouse events
-        # self.rpmMeter.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouserpmMeter)
-        # self.rpmMeter.SetToolTip(wx.ToolTip("Drag the speed dial to change the speed!"))
-    #Define the control slider
-        self.rpmSlider = wx.Slider(panel1, -1, 2500, 0, 10000,
-                           style=wx.SL_HORIZONTAL | wx.SL_AUTOTICKS | wx.SL_LABELS )
-        self.rpmSlider.SetTickFreq(5)
-    #Bind the slider
-        self.rpmSlider.Bind(wx.EVT_SCROLL, self.OnRpmSliderScroll)
-        self.rpmSlider.SetToolTip(wx.ToolTip("Drag The Slider To Change The Speed!"))
     
     # Gear display
     ##############
@@ -671,7 +600,6 @@ class PanelDashboard(wx.Panel, object):
         vsizer1 = wx.BoxSizer(wx.VERTICAL)
         hsizer1 = wx.BoxSizer(wx.HORIZONTAL)
 
-        hsizer1.Add(self.speedSlider, 1, wx.EXPAND)
         vsizer1.Add(self.speedMeter, 0, wx.EXPAND)
         vsizer1.Add(hsizer1, 0, wx.EXPAND)
         
@@ -685,7 +613,6 @@ class PanelDashboard(wx.Panel, object):
         vsizer3 = wx.BoxSizer(wx.VERTICAL)
         hsizer3 = wx.BoxSizer(wx.HORIZONTAL)
 
-        hsizer3.Add(self.rpmSlider, 1, wx.EXPAND)
         vsizer3.Add(self.rpmMeter, 0, wx.EXPAND)
         vsizer3.Add(hsizer3, 0, wx.EXPAND)
         
@@ -694,9 +621,10 @@ class PanelDashboard(wx.Panel, object):
         hsizermain.Add(vsizer1, 1, wx.EXPAND)
         hsizermain.Add(vsizer2, 1, wx.EXPAND)
         hsizermain.Add(vsizer3, 1, wx.EXPAND)
+        
         #Set the panel1 sizer
-        # panel1.SetSizer(vsizer1)
         panel1.SetSizer(hsizermain)
+        
         #Fit contents
         panel1.Fit()
         
@@ -713,22 +641,12 @@ class PanelDashboard(wx.Panel, object):
         pub.subscribe(self.sub_listener_rpm, "telemetry_rpm")
         pub.subscribe(self.sub_listener_max_rpm, "telemetry_max_rpm")
         
-    def OnSpeedSliderScroll(self, event):
-        speedSlider = event.GetEventObject()
-        self.speedMeter.SetSpeedValue(speedSlider.GetValue())
-        event.Skip()
-
-    # def OnMouseSpeedMeter(self, event):
-        # speedMeter = event.GetEventObject()
-        # self.speedSlider.SetValue(speedMeter.GetSpeedValue())
-        # event.Skip()
-    
     def RpmMaxUpdate (self, rpm_max):
         """Updates the max RPM value for the meter display by rounding to the immediate thousands up"""
         self.rpm_meter_ticks_number = (int(rpm_max / 1000) + 1)
         self.rpm_max_meter = self.rpm_meter_ticks_number * 1000
     
-    def RpmSliderConfig(self, rpm_max):
+    def RpmMeterConfig(self, rpm_max):
         self.RpmMaxUpdate (rpm_max)
         intervals = range(0, int(self.rpm_max_meter + 1), int(self.rpm_max_meter / self.rpm_meter_ticks_number))
         self.rpmMeter.SetIntervals(intervals)
@@ -739,16 +657,6 @@ class PanelDashboard(wx.Panel, object):
         self.rpmMeter.SetTicksColour(wx.WHITE)
         self.rpmMeter.SetNumberOfSecondaryTicks(1)
         self.rpmMeter.DrawExternalArc(False)
-    
-    def OnRpmSliderScroll(self, event):
-        rpmSlider = event.GetEventObject()
-        self.rpmMeter.SetSpeedValue(rpmSlider.GetValue())
-        event.Skip()
-
-    # def OnMouseRpmMeter(self, event):
-        # speedMeter = event.GetEventObject()
-        # self.rpmSlider.SetValue(rpmMeter.GetSpeedValue())
-        # event.Skip()
     
     def sub_listener_track_progress(self, message):
         self.progressBar.SetValue(int(message * 100))
@@ -773,7 +681,7 @@ class PanelDashboard(wx.Panel, object):
     def sub_listener_max_rpm(self, message):
         if (message != self.rpm_max):
             self.rpm_max = message
-            self.RpmSliderConfig(message)
+            self.RpmMeterConfig(message)
         else:
             pass
         
@@ -789,7 +697,6 @@ class MainFrame(wx.Frame):
     
     def __init__(self, *args, **kw):
         # ensure the parent's __init__ is called
-        # super(MainFrame, self).__init__(*args, **kw, size=(1000, 800))
         super(MainFrame, self).__init__(*args, **kw)
         
         # create a menu bar
@@ -817,21 +724,12 @@ class MainFrame(wx.Frame):
         # Add CMD panel
         self.PanelDeviceCommunication = PanelDeviceCommunication(self)
         
-        # vbox.Add(self.PanelSerial, 0, wx.EXPAND | wx.UP, 5)
-        # vbox.Add(self.PanelConsole, 1, wx.EXPAND)
         vbox.Add(self.PanelSerial, 0, wx.EXPAND | wx.UP, 5)
         vbox.Add(self.PanelDeviceCommunication, 1, wx.EXPAND)
-        # vbox.Add((3, -1))
         
-        # panel.SetSizer(vbox)
-        
-        # self.Fit()
-        # self.Layout()
         
         """https://discuss.wxpython.org/t/help-with-paintevents-and-displaying-multiple-panels/34913"""
         self.main_ui_grid_sizer = wx.GridBagSizer(vgap = 0, hgap = 0)
-        # self.main_ui_grid_sizer.Add(self.PanelSerial, pos=(0,0), flag=wx.EXPAND)
-        # self.main_ui_grid_sizer.Add(self.PanelSerial, pos=(0,0))
         self.main_ui_grid_sizer.Add(vbox, pos=(0,0))
         self.main_ui_grid_sizer.Add(self.PanelConsole, pos=(0,1), flag=wx.EXPAND)
         self.main_ui_grid_sizer.Add(self.PanelLogger, pos=(1,0), flag=wx.EXPAND)

@@ -9,8 +9,8 @@ from source import networking
 from source import utils
 from source import plots
 from source import settings
-# from source.dr1.game_dr1 import GameDr1
 from source.dirt_rally.game_dirt_rally import GameDirtRally
+from source.richard_burns_rally.game_rbr import GameRichardBurnsRally
 
 
 class GameState(Enum):
@@ -46,7 +46,8 @@ class LoggerBackend:
 
     @staticmethod
     def get_all_valid_games():
-        valid_games = GameDirtRally.get_valid_game_names()  # + ...
+        # valid_games = GameDirtRally.get_valid_game_names()  # + ...
+        valid_games = GameDirtRally.get_valid_game_names() + GameRichardBurnsRally.get_valid_game_names()
         return valid_games
 
     def change_game(self, new_game_name):
