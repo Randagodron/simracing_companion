@@ -202,6 +202,18 @@ class GameDirtRally(GameBase):
             return 0.0
         else:
             return session_collection[udp_data.Fields.rpm.value, -1]
+
+    def get_max_rpm(self, session_collection):
+        if session_collection.shape[1] == 0:
+            return 0.0
+        else:
+            return session_collection[udp_data.Fields.max_rpm.value, -1]
+    
+    def get_max_gears(self, session_collection):
+        if session_collection.shape[1] == 0:
+            return 0.0
+        else:
+            return session_collection[udp_data.Fields.max_gears.value, -1]
     
     def get_speed(self, session_collection):
         if session_collection.shape[1] == 0:

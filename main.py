@@ -136,6 +136,7 @@ class PanelSerial(wx.Panel, object):
 
         self.parent = parent
         self.port_open = False
+        self.debug_enable = False
         
         # COM ports
         # Serial ports
@@ -152,6 +153,10 @@ class PanelSerial(wx.Panel, object):
         buttonRefresh     = wx.Button(self, label="Refresh", size=wx.Size(100, 32))
         buttonRefresh.Bind(wx.EVT_BUTTON, self.OnClickPortsRefresh)
         
+        self.buttonDebug     = wx.Button(self, label="Debug info", size=wx.Size(100, 32))
+        self.buttonDebug.SetBackgroundColour('green')
+        self.buttonDebug.Bind(wx.EVT_BUTTON, self.OnClickDebug)
+        
         listSerialPorts   = wx.Choice(self, choices=ports_description_list)
         listSerialPorts.Bind(wx.EVT_CHOICE, self.getOnSelectSerial(listSerialPorts))
         
@@ -159,11 +164,10 @@ class PanelSerial(wx.Panel, object):
         self.buttonConnect.SetBackgroundColour('green')
         self.buttonConnect.Bind(wx.EVT_BUTTON, self.getOnClickPortsConnect(ports_list, listSerialPorts.GetCurrentSelection()))
         
-        
-        
         boxSizerSerial = wx.StaticBoxSizer(wx.VERTICAL, self, "Serial communication")
         boxSizerSerial.Add(listSerialPorts, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         boxSizerSerial.Add(buttonRefresh, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerSerial.Add(self.buttonDebug, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         boxSizerSerial.Add(self.buttonConnect, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         
         self.SetSizer(boxSizerSerial)
@@ -179,6 +183,16 @@ class PanelSerial(wx.Panel, object):
         # print("Refresh\n") # DEBUG
         # pub.sendMessage("print_console", message="Refresh") # DEBUG
         pass
+        
+    def OnClickDebug(self, event):
+        if (self.debug_enable):
+            self.buttonDebug.SetBackgroundColour('green')
+            self.buttonDebug.SetLabel("Debug info")
+            self.debug_enable = False
+        else:
+            self.buttonDebug.SetBackgroundColour('red')
+            self.buttonDebug.SetLabel("Debug stop")
+            self.debug_enable = True
         
     def getOnClickPortsConnect(self, ports_list, port_current_selection):
         def OnClickPortsConnect(event):
@@ -291,7 +305,7 @@ class PanelDeviceCommunication(wx.Panel, object):
         pub.subscribe(self.sub_listener_rpm, "telemetry_rpm")
         
         # Control for communication periodicity
-        self.controlCommunicationPeriod = wx.SpinCtrl(self, size=wx.Size(50, 20), min=0, max=1000, initial=800)
+        self.controlCommunicationPeriod = wx.SpinCtrl(self, size=wx.Size(50, 20), min=0, max=1000, initial=50)
         self.controlCommunicationPeriod.Bind(wx.EVT_SPINCTRL, self.getOnPeriodChange())
         
         # DEBUG
@@ -349,9 +363,8 @@ class PanelDeviceCommunication(wx.Panel, object):
             pub.sendMessage("serial_tx", message=struct.pack('>cHHchcB', bytes('R', "utf-8"), random.randint(100, 8000), 8000, bytes('S', "utf-8"), random.randint(1, 180), bytes('G', "utf-8"), random.choice([0,1,2,3,4,5,6,7,10])))
  # DEBUG
         else :
-            pub.sendMessage("serial_tx", message=struct.pack('>cHHchcB', bytes('R', "utf-8"), self.data['rpm'], self.data['max_rpm'], bytes('S', "utf-8"), self.data['speed'], bytes('G', "utf-8"), self.data['gear']))
-        
-        # print("serial_send") # DEBUG
+            pub.sendMessage("serial_tx", message= struct.pack('>cHHchcB', bytes('R', "utf-8"), self.rpm, self.max_rpm, bytes('S', "utf-8"), self.speed, bytes('G', "utf-8"), self.gear))
+            # print(struct.pack('>cHHchcB', bytes('R', "utf-8"), self.rpm, self.max_rpm, bytes('S', "utf-8"), self.speed, bytes('G', "utf-8"), self.gear)) # DEBUG
         
         with self.thread_lock:
             if self.periodic_send_enable:
@@ -361,13 +374,13 @@ class PanelDeviceCommunication(wx.Panel, object):
                 self.serial_send_thread_timer.cancel()
         
     def sub_listener_gear(self, message):
-        if (int(message) == 10):
-            self.gear = 9
-        else:
-            self.gear = int(message)
+        self.gear = int(message)
     
     def sub_listener_rpm(self, message):
         self.rpm = int(message)
+    
+    def sub_listener_max_rpm(self, message):
+        self.max_rpm = int(message)
         
     def sub_listener_speed(self, message):
         self.speed = int(message)
@@ -598,23 +611,27 @@ class PanelDashboard(wx.Panel, object):
         
     # Rpmmeter
     #############
+        self.rpm_max = 9500
+        self.rpm_max_meter = 10000
         self.rpmMeter = SM.SpeedMeter(panel1, -1, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS, size = (300,300), mousestyle=0)
 
-        self.rpmMeter.SetAngleRange(-pi/6, 7*pi/6)
-        intervals = range(0, 10001, 1000)
-        self.rpmMeter.SetIntervals(intervals)
-        colours = [wx.BLACK]*10
-        self.rpmMeter.SetIntervalColours(colours)
-        ticks = [str(interval) for interval in intervals]
-        self.rpmMeter.SetTicks(ticks)
-        self.rpmMeter.SetTicksColour(wx.WHITE)
-        self.rpmMeter.SetNumberOfSecondaryTicks(1)
+        # self.rpmMeter.SetAngleRange(-pi/6, 7*pi/6)
+        # intervals = range(0, int(self.rpm_max + 1), int(self.rpm_max / 10))
+        # self.rpmMeter.SetIntervals(intervals)
+        # colours = [wx.BLACK]*10
+        # self.rpmMeter.SetIntervalColours(colours)
+        # ticks = [str(interval) for interval in intervals]
+        # self.rpmMeter.SetTicks(ticks)
+        # self.rpmMeter.SetTicksColour(wx.WHITE)
+        # self.rpmMeter.SetNumberOfSecondaryTicks(1)
         self.rpmMeter.SetTicksFont(wx.Font(7, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
         self.rpmMeter.SetMiddleText("RPM")
         self.rpmMeter.SetMiddleTextColour(wx.WHITE)
         self.rpmMeter.SetMiddleTextFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
         self.rpmMeter.SetHandColour(wx.Colour(255, 50, 0))
-        self.rpmMeter.DrawExternalArc(False)
+        # self.rpmMeter.DrawExternalArc(False)
+        
+        self.RpmSliderConfig(self.rpm_max)
         self.rpmMeter.SetSpeedValue(2500)
     #Bind mouse events
         # self.rpmMeter.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouserpmMeter)
@@ -694,6 +711,7 @@ class PanelDashboard(wx.Panel, object):
         pub.subscribe(self.sub_listener_gear, "telemetry_gear")
         pub.subscribe(self.sub_listener_speed, "telemetry_speed")
         pub.subscribe(self.sub_listener_rpm, "telemetry_rpm")
+        pub.subscribe(self.sub_listener_max_rpm, "telemetry_max_rpm")
         
     def OnSpeedSliderScroll(self, event):
         speedSlider = event.GetEventObject()
@@ -704,6 +722,23 @@ class PanelDashboard(wx.Panel, object):
         # speedMeter = event.GetEventObject()
         # self.speedSlider.SetValue(speedMeter.GetSpeedValue())
         # event.Skip()
+    
+    def RpmMaxUpdate (self, rpm_max):
+        """Updates the max RPM value for the meter display by rounding to the immediate thousands up"""
+        self.rpm_meter_ticks_number = (int(rpm_max / 1000) + 1)
+        self.rpm_max_meter = self.rpm_meter_ticks_number * 1000
+    
+    def RpmSliderConfig(self, rpm_max):
+        self.RpmMaxUpdate (rpm_max)
+        intervals = range(0, int(self.rpm_max_meter + 1), int(self.rpm_max_meter / self.rpm_meter_ticks_number))
+        self.rpmMeter.SetIntervals(intervals)
+        colours = [wx.BLACK]*self.rpm_meter_ticks_number
+        self.rpmMeter.SetIntervalColours(colours)
+        ticks = [str(interval) for interval in intervals]
+        self.rpmMeter.SetTicks(ticks)
+        self.rpmMeter.SetTicksColour(wx.WHITE)
+        self.rpmMeter.SetNumberOfSecondaryTicks(1)
+        self.rpmMeter.DrawExternalArc(False)
     
     def OnRpmSliderScroll(self, event):
         rpmSlider = event.GetEventObject()
@@ -730,7 +765,17 @@ class PanelDashboard(wx.Panel, object):
             self.gearLed.SetValue(str(int(message)))
         
     def sub_listener_rpm(self, message):
-        self.rpmMeter.SetSpeedValue(message)
+        if (message < self.rpm_max_meter):
+            self.rpmMeter.SetSpeedValue(message)
+        else:
+            self.rpmMeter.SetSpeedValue(self.rpm_max_meter)
+        
+    def sub_listener_max_rpm(self, message):
+        if (message != self.rpm_max):
+            self.rpm_max = message
+            self.RpmSliderConfig(message)
+        else:
+            pass
         
     def sub_listener_speed(self, message):
         self.speedMeter.SetSpeedValue(message)
