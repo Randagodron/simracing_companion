@@ -34,6 +34,8 @@ import os.path
 
 # Misc. imports
 from math import pi, sqrt
+import struct
+import random
 
 # Dr2_logger classes
 from source.logger_backend import LoggerBackend
@@ -133,6 +135,7 @@ class PanelSerial(wx.Panel, object):
         wx.Panel.__init__(self, parent, *args, **kwargs)
 
         self.parent = parent
+        self.port_open = False
         
         # COM ports
         # Serial ports
@@ -152,13 +155,20 @@ class PanelSerial(wx.Panel, object):
         listSerialPorts   = wx.Choice(self, choices=ports_description_list)
         listSerialPorts.Bind(wx.EVT_CHOICE, self.getOnSelectSerial(listSerialPorts))
         
-        buttonConnect     = wx.Button(self, label="Connect", size=wx.Size(100, 32))
-        buttonConnect.Bind(wx.EVT_BUTTON, self.getOnClickPortsConnect(ports_list, listSerialPorts.GetCurrentSelection()))
+        self.buttonConnect     = wx.Button(self, label="Connect", size=wx.Size(100, 32))
+        self.buttonConnect.SetBackgroundColour('green')
+        self.buttonConnect.Bind(wx.EVT_BUTTON, self.getOnClickPortsConnect(ports_list, listSerialPorts.GetCurrentSelection()))
+        
+        # DEBUG
+        buttonTest     = wx.Button(self, label="Test", size=wx.Size(100, 32))
+        buttonTest.Bind(wx.EVT_BUTTON, self.getOnClickTest())
         
         boxSizerSerial = wx.StaticBoxSizer(wx.VERTICAL, self, "Serial communication")
         boxSizerSerial.Add(listSerialPorts, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         boxSizerSerial.Add(buttonRefresh, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
-        boxSizerSerial.Add(buttonConnect, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        boxSizerSerial.Add(self.buttonConnect, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        #DEBUG
+        boxSizerSerial.Add(buttonTest, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         
         # self.SetSizer(sizer)
         self.SetSizer(boxSizerSerial)
@@ -167,6 +177,7 @@ class PanelSerial(wx.Panel, object):
         # Subscribe to general config and serial config
         pub.subscribe(self.sub_listener, "config_general")
         pub.subscribe(self.sub_listener, "config_serial")
+        pub.subscribe(self.sub_listener_send, "serial_tx")
     
     def OnClickPortsRefresh(self, event):
         # self.scan_com_ports()
@@ -176,12 +187,38 @@ class PanelSerial(wx.Panel, object):
         
     def getOnClickPortsConnect(self, ports_list, port_current_selection):
         def OnClickPortsConnect(event):
-            # pub.sendMessage("print_console", message="Ports connect") # DEBUG
-            ser = serial.Serial(ports_list[port_current_selection], 115200)
-            # print(ser.name) # DEBUG
-            pub.sendMessage("print_console", message="Connection to port: %s - Bandrate: %d" % (ser.name, 115200))
-            # pub.sendMessage("print_console", message=ser.name)
+            if self.port_open: # Check if a port is already opened
+                self.ser.close()
+                self.port_open = False
+                pub.sendMessage("print_console", message="Disconnecting port: %s - Bandrate: %d" % (self.ser.name, 115200))
+                self.buttonConnect.SetBackgroundColour('green')
+                self.buttonConnect.SetLabel('Connect')
+            else:
+                # pub.sendMessage("print_console", message="Ports connect") # DEBUG
+                self.ser = serial.Serial(ports_list[port_current_selection], 115200)
+                # self.ser.open() # Useless, port is automatically opened upon creation
+                # print(self.ser.name) # DEBUG
+                
+                if self.ser.is_open: # Check if port was successfully opened
+                    self.port_open = True
+                    pub.sendMessage("print_console", message="Connection to port: %s - Bandrate: %d" % (self.ser.name, 115200))
+                    self.buttonConnect.SetBackgroundColour('red')
+                    self.buttonConnect.SetLabel('Disconnect')
+                else: # Otherwise print error message
+                    self.port_open = False
+                    pub.sendMessage("print_console", message="Error while opening serial port !")
+                    self.buttonConnect.SetBackgroundColour('green')
+                    self.buttonConnect.SetLabel('Connect')
+                    
+                # pub.sendMessage("print_console", message=self.ser.name) # DEBUG
+            
         return OnClickPortsConnect
+        
+    def getOnClickTest(self):
+        def OnClickTest(event):
+            pub.sendMessage("serial_tx", message=struct.pack('>cHHchcB', bytes('R', "utf-8"), int(random.randint(100, 8000)), 8000, bytes('S', "utf-8"), int(random.randint(1, 180)), bytes('G', "utf-8"), int(random.randint(1, 7)))) # DEBUG
+            # pub.sendMessage("serial_tx", message=struct.pack('>cHH', bytes('R', "utf-8"), 5500, 8000)) # DEBUG
+        return OnClickTest
         
     """https://stackoverflow.com/questions/173687/is-it-possible-to-pass-arguments-into-event-bindings"""
     def getOnSelectSerial(self, list_serial_ports):
@@ -211,6 +248,73 @@ class PanelSerial(wx.Panel, object):
         Listener function
         """
         print(message)
+        
+    def sub_listener_send(self, message):
+        """
+        Send data to serial port
+        """
+        if self.ser.is_open:
+            self.ser.write(message)
+            # print(message) # DEBUG
+        else:
+            pass
+
+
+class PanelDeviceCommunication(wx.Panel, object):
+# ======================================================================================
+    """Device Communication (DCM) panel - Parses received serial messages, construct sent serial messages"""
+    def __init__(self, parent, *args, **kwargs):
+        """Create the PanelDeviceCommunication."""
+        wx.Panel.__init__(self, parent, *args, **kwargs)
+
+        self.parent = parent
+        
+        # self.speed_modifier = speed_units == 'mph' and 0.6214 or 1
+        self.speed_modifier = 1
+        
+        self.gear = 0
+        self.speed = 0
+        self.rpm = 0
+        self.max_rpm = 10000
+        self.data = {
+        # 'speed': int(stats[7] * 3.6 * self.speed_modifier),
+        # 'speed': int(speed * 3.6 * self.speed_modifier),
+        'speed': int(self.speed * self.speed_modifier),
+        # 'gear': int(stats[33]),
+        'gear': int(self.gear),
+        # 'rpm': int(stats[37] * 10),
+        'rpm': int(self.rpm),
+        # 'max_rpm': int(stats[63] * 10)
+        'max_rpm': int(self.max_rpm)
+        }
+        
+        # Subscribe to general config and serial config
+        pub.subscribe(self.sub_listener_gear, "telemetry_gear")
+        pub.subscribe(self.sub_listener_speed, "telemetry_speed")
+        pub.subscribe(self.sub_listener_rpm, "telemetry_rpm")
+        
+    def serial_send(self, data):
+        self.ser.write(struct.pack('>cHHchcB', 'R', self.data['rpm'], self.data['max_rpm'], 'S', self.data['speed'], 'G', self.data['gear']))
+        
+    def sub_listener_gear(self, message):
+        if (int(message) == 10):
+            # self.gearLed.SetValue(str(9))
+            self.gear = 9
+            # pass
+        else:
+            # self.gearLed.SetValue(str(int(message)))
+            self.gear = int(message)
+            # pass
+    
+    def sub_listener_rpm(self, message):
+        # self.rpmMeter.SetSpeedValue(message)
+        # pass
+        self.rpm = int(message)
+        
+    def sub_listener_speed(self, message):
+        # self.speedMeter.SetSpeedValue(message)
+        # pass
+        self.speed = int(message)
 
 
 # ======================================================================================
