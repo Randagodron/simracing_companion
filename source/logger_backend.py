@@ -51,16 +51,22 @@ class LoggerBackend:
         return valid_games
 
     def change_game(self, new_game_name):
-
+        # Check if Dirt is selected
         if new_game_name in GameDirtRally.get_valid_game_names():
             self.game_name = new_game_name
             self.game = GameDirtRally(game_name=new_game_name)
-
             if new_game_name != settings.settings['general']['game']:
                 settings.settings['general']['game'] = new_game_name
                 settings.write_settings()
+                
+        # Check if RBR is selected
+        elif new_game_name in GameRichardBurnsRally.get_valid_game_names():
+            self.game_name = new_game_name
+            self.game = GameRichardBurnsRally(game_name=new_game_name)
+
         # elif game_name == 'Project Cars 2':
         #     self.game = GameProjectCars2()
+        
         else:
             if new_game_name is not None:
                 print("Invalid game name in settings: {}, reverting to '{}'".format(
@@ -267,9 +273,12 @@ class LoggerBackend:
             # pub.sendMessage("print_console", message=str(self.new_state))
             pub.sendMessage("telemetry_track_progress", message=self.game.get_progress(self.session_collection))
             pub.sendMessage("telemetry_track_duration", message=int(self.game.get_race_duration(self.session_collection)))
-            pub.sendMessage("telemetry_speed", message=(self.game.get_speed(self.session_collection) * 5.0))
-            pub.sendMessage("telemetry_rpm", message=(self.game.get_rpm(self.session_collection) * 10.0))
-            pub.sendMessage("telemetry_max_rpm", message=(self.game.get_max_rpm(self.session_collection) * 10.0))
+            # pub.sendMessage("telemetry_speed", message=(self.game.get_speed(self.session_collection) * 5.0))
+            pub.sendMessage("telemetry_speed", message=(self.game.get_speed(self.session_collection)))
+            # pub.sendMessage("telemetry_rpm", message=(self.game.get_rpm(self.session_collection) * 10.0))
+            pub.sendMessage("telemetry_rpm", message=(self.game.get_rpm(self.session_collection)))
+            # pub.sendMessage("telemetry_max_rpm", message=(self.game.get_max_rpm(self.session_collection) * 10.0))
+            pub.sendMessage("telemetry_max_rpm", message=(self.game.get_max_rpm(self.session_collection)))
             # pub.sendMessage("telemetry_max_gears", message=(self.game.get_max_gears(self.session_collection)))
             pub.sendMessage("telemetry_gear", message=self.game.get_gear(self.session_collection))
 

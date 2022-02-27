@@ -66,3 +66,24 @@ I have build a dash screen based on the [STMicroelectronics Discovery STM32F746N
 
 My approach is to have a single external device that will manage the external display and the reading of the accessories inputs. At the moment I use the USB device library in order to provide a HID connection to the PC for the inputs, the serial data for the dash display being sent through the VCOM of the debug USB. My goal is to have everything multiplexed in the VCOM, in order to have only one USB cable.
 
+TODO
+----
+
+- Modify dr2_logger architecture to better separate the specifics from a game and the common functions,
+- Have some kind of inference table and / or "service availability" table in order to have a generic structure for the data and automatically fill dummy values where data are not available,
+- Remove YAML config, re-organise config.ini with specific values for each game available,
+- Clean RBR data logging,
+- Display the logger plots in a fancy GUI window with tabs <3,
+- Correct bugs,
+- Add input management module,
+
+CHANGELOG
+---------
+
+### 2022-02-27
+
+Added basic support for Richard Burns Rally, with reading of RPM, speed and gear. The rest of the data is still a mess and needs to be sorted out.
+
+### 2022-02-26
+
+First usable release, support for Dirt 1, data logging, speed / RPM / gear / track progress / time display, and communication with external dashboard.

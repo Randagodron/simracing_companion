@@ -142,7 +142,7 @@ class GameRichardBurnsRally(GameBase):
         max_gears = sample[udp_data.Fields.max_gears.value]
 
         key = (max_rpm, idle_rpm, max_gears)
-        car_data = car_data_dr1 if self.game_name == GameRichardBurnsRally.valid_game_name_dr1 else car_data_dr2
+        car_data = car_data_rbr
         if key in car_data.car_dict.keys():
             car_name = car_data.car_dict[key]
         else:
@@ -176,7 +176,7 @@ class GameRichardBurnsRally(GameBase):
         length = sample[udp_data.Fields.track_length.value]
         start_z = sample[udp_data.Fields.pos_z.value]
 
-        track_data = track_data_dr1 if self.game_name == GameRichardBurnsRally.valid_game_name_dr1 else track_data_dr2
+        track_data = track_data_rbr
         if start_z is not None and length in track_data.track_dict.keys():
             track_candidates = track_data.track_dict[length]
             track_candidates_start_z = np.array([t[0] for t in track_candidates])
@@ -222,7 +222,7 @@ class GameRichardBurnsRally(GameBase):
         if session_collection.shape[1] == 0:
             return 0
         else:
-            return session_collection[udp_data.Fields.gear.value, -1]
+            return session_collection[udp_data.Fields.gear.value, -1] - 1 # Neutral is 1
 
     @staticmethod
     def get_run_time_cleaned(run_time_raw: np.ndarray):

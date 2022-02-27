@@ -3,6 +3,9 @@ import socket
 import struct
 from enum import Enum
 
+# DEBUG
+from pubsub import pub
+
 debugging = False  # enable to simulate incoming UDP datagrams
 debugging_counter = -1
 if debugging:
@@ -14,6 +17,14 @@ else:
 # https://docs.google.com/spreadsheets/d/1UTgeE7vbnGIzDz-URRk2eBIPc_LR1vWcZklp7xD9N0Y/edit#gid=0
 # https://github.com/soong-construction/
 
+# # DEBUG
+# debug_index = 0
+
+# def sub_listener_debug_index(message):
+    # global debug_index
+    # debug_index = message
+
+# pub.subscribe(sub_listener_debug_index, "debug_index")
 
 class Fields(Enum):
     run_time =            0
@@ -98,12 +109,24 @@ def bit_stream_to_float32(data, pos):
         print('Failed to get data item at pos {}. Make sure to set extradata=3 in the hardware settings.'.format(pos))
     return value
 
+def bit_stream_to_int32(data, pos):
+    try:
+        value = struct.unpack('i', data[pos:pos+4])[0]
+    except struct.error as _:
+        value = 0
+        # print('Failed to get data item at pos {}'.format(pos))
+    except Exception as e:
+        value = 0
+        print('Failed to get data item at pos {}. Make sure to set extradata=3 in the hardware settings.'.format(pos))
+    return value
+
 
 def receive(udp_socket):
 
     global debugging
     global debugging_counter
     global debug_data
+    global debug_index
     if debugging:
         import time
         time.sleep(0.01)
@@ -118,17 +141,23 @@ def receive(udp_socket):
     except socket.timeout as _:
         return None, None
 
+    # DEBUG
+    # pub.sendMessage("debug", message=bit_stream_to_float32(data, debug_index))
+    # pub.sendMessage("debug", message=struct.unpack('i', data[debug_index:debug_index+4])[0])
+
     run_time = bit_stream_to_float32(data, 0)
-    lap_time = bit_stream_to_float32(data, 4)
-    distance = max(bit_stream_to_float32(data, 8), 0)
-    progress = bit_stream_to_float32(data, 12)  # 0-1
-    pos_x = bit_stream_to_float32(data, 16)
-    pos_y = bit_stream_to_float32(data, 20)
-    pos_z = bit_stream_to_float32(data, 24)
-    speed_ms = bit_stream_to_float32(data, 28)  # * 3.6 for Km/h
+    lap_time = bit_stream_to_float32(data, 12)
+    distance = max(bit_stream_to_float32(data, 16), 0)
+    progress = bit_stream_to_float32(data, 8)  # 0-1
+    pos_x = bit_stream_to_float32(data, 64)
+    pos_y = bit_stream_to_float32(data, 68)
+    pos_z = bit_stream_to_float32(data, 72)
+    speed_ms = bit_stream_to_float32(data, 60)  # * 3.6 for Km/h
     vel_x = bit_stream_to_float32(data, 32)  # velocity in world space
     vel_y = bit_stream_to_float32(data, 36)  # velocity in world space
     vel_z = bit_stream_to_float32(data, 40)  # velocity in world space
+    
+   # Not defined
     roll_x = bit_stream_to_float32(data, 44)
     roll_y = bit_stream_to_float32(data, 48)
     roll_z = bit_stream_to_float32(data, 52)
@@ -139,23 +168,35 @@ def receive(udp_socket):
     susp_rr = bit_stream_to_float32(data, 72)  # Suspension travel aft right
     susp_fl = bit_stream_to_float32(data, 76)  # Suspension travel fwd left
     susp_fr = bit_stream_to_float32(data, 80)  # Suspension travel fwd right
-    susp_vel_rl = bit_stream_to_float32(data, 84)
-    susp_vel_rr = bit_stream_to_float32(data, 88)
-    susp_vel_fl = bit_stream_to_float32(data, 92)
-    susp_vel_fr = bit_stream_to_float32(data, 96)
+    # Not defined
+    
+    susp_vel_rl = bit_stream_to_float32(data, 436)
+    susp_vel_rr = bit_stream_to_float32(data, 564)
+    susp_vel_fl = bit_stream_to_float32(data, 180)
+    susp_vel_fr = bit_stream_to_float32(data, 308)
+    
+    # Not defined
     wsp_rl = bit_stream_to_float32(data, 100)  # Wheel speed aft left
     wsp_rr = bit_stream_to_float32(data, 104)  # Wheel speed aft right
     wsp_fl = bit_stream_to_float32(data, 108)  # Wheel speed fwd left
     wsp_fr = bit_stream_to_float32(data, 112)  # Wheel speed fwd right
-    throttle = bit_stream_to_float32(data, 116)  # Throttle 0-1
-    steering = bit_stream_to_float32(data, 120)  # -1..+1
-    brakes = bit_stream_to_float32(data, 124)  # Brakes 0-1
-    clutch = bit_stream_to_float32(data, 128)  # Clutch 0-1
-    gear = bit_stream_to_float32(data, 132)  # Gear, neutral = 0
+    # Not defined
+    
+    throttle = bit_stream_to_float32(data, 28)  # Throttle 0-1
+    steering = bit_stream_to_float32(data, 24)  # -1..+1
+    brakes = bit_stream_to_float32(data, 32)  # Brakes 0-1
+    clutch = bit_stream_to_float32(data, 40)  # Clutch 0-1
+    gear = bit_stream_to_int32(data, 44)  # Gear, neutral = 0
+    
+    # Not defined
     g_force_lat = bit_stream_to_float32(data, 136)
     g_force_lon = bit_stream_to_float32(data, 140)
     current_lap = bit_stream_to_float32(data, 144)  # Current lap, starts at 0
-    rpm = bit_stream_to_float32(data, 148)  # RPM, requires * 10 for realistic values
+    # Not defined
+    
+    rpm = bit_stream_to_float32(data, 136)  # RPM, requires * 10 for realistic values
+    
+    # Not defined
     sli_pro_support = bit_stream_to_float32(data, 152)  # ignored
     car_pos = bit_stream_to_float32(data, 156)
     kers_level = bit_stream_to_float32(data, 160)  # ignored
@@ -169,21 +210,30 @@ def receive(udp_socket):
     sector = bit_stream_to_float32(data, 192)
     sector_1_time = bit_stream_to_float32(data, 196)
     sector_2_time = bit_stream_to_float32(data, 200)
-    brakes_temp_rl = bit_stream_to_float32(data, 204)
-    brakes_temp_rr = bit_stream_to_float32(data, 208)
-    brakes_temp_fl = bit_stream_to_float32(data, 212)
-    brakes_temp_fr = bit_stream_to_float32(data, 216)
-    tyre_pressure_rl = bit_stream_to_float32(data, 220)
-    tyre_pressure_rr = bit_stream_to_float32(data, 224)
-    tyre_pressure_fl = bit_stream_to_float32(data, 228)
-    tyre_pressure_fr = bit_stream_to_float32(data, 232)
+    # Not defined
+    
+    brakes_temp_rl = bit_stream_to_float32(data, 444)
+    brakes_temp_rr = bit_stream_to_float32(data, 572)
+    brakes_temp_fl = bit_stream_to_float32(data, 188)
+    brakes_temp_fr = bit_stream_to_float32(data, 316)
+    tyre_pressure_rl = bit_stream_to_float32(data, 452)
+    tyre_pressure_rr = bit_stream_to_float32(data, 580)
+    tyre_pressure_fl = bit_stream_to_float32(data, 196)
+    tyre_pressure_fr = bit_stream_to_float32(data, 324)
+    
+    # Not defined
     laps_completed = bit_stream_to_float32(data, 236)
     total_laps = bit_stream_to_float32(data, 240)
-    track_length = bit_stream_to_float32(data, 244)
+    # Not defined
+    
+    track_length = bit_stream_to_float32(data, 16)
+    
+    # Not defined
     last_lap_time = bit_stream_to_float32(data, 248)
     max_rpm = bit_stream_to_float32(data, 252)  # requires * 10 for realistic values
     idle_rpm = bit_stream_to_float32(data, 256)  # requires * 10 for realistic values
     max_gears = bit_stream_to_float32(data, 260)
+    # Not defined
 
     return np.array([
         run_time, lap_time, distance, progress, pos_x, pos_y, pos_z, speed_ms, vel_x, vel_y, vel_z,
@@ -195,4 +245,5 @@ def receive(udp_socket):
         tyre_pressure_rl, tyre_pressure_rr, tyre_pressure_fl, tyre_pressure_fr, laps_completed,
         total_laps, track_length, last_lap_time, max_rpm, idle_rpm, max_gears
     ]), data
+
 

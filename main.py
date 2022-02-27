@@ -86,7 +86,8 @@ def udp_listen():
         logger_backend.check_udp_messages()
         msg = logger_backend.check_state_changes()
         if len(msg) > 0:
-            pub.sendMessage("print_console", message=msg)
+            # pub.sendMessage("print_console", message=msg)
+            print(msg)
 
 def thread_dr2logger_init():
     global logger_backend
@@ -189,8 +190,8 @@ class PanelSerial(wx.Panel, object):
     def getOnClickPortsConnect(self, ports_list, port_current_selection):
         def OnClickPortsConnect(event):
             if self.port_open: # Check if a port is already opened
-                self.ser.close()
                 self.port_open = False
+                self.ser.close()
                 pub.sendMessage("print_console", message="Disconnecting port: %s - Bandrate: %d" % (self.ser.name, 115200))
                 self.buttonConnect.SetBackgroundColour('green')
                 self.buttonConnect.SetLabel('Connect')
@@ -257,6 +258,7 @@ class PanelDeviceCommunication(wx.Panel, object):
         self.periodic_send_enable = True
         self.timer_send_period = 0.1
         self.test_enable = False
+        self.debug_index = 0
         
         # self.speed_modifier = speed_units == 'mph' and 0.6214 or 1
         self.speed_modifier = 1
@@ -286,10 +288,14 @@ class PanelDeviceCommunication(wx.Panel, object):
         self.buttonTest.SetBackgroundColour('green')
         self.buttonTest.Bind(wx.EVT_BUTTON, self.getOnClickTest())
         
+        # self.controlDebugIndex = wx.SpinCtrl(self, size=wx.Size(50, 20), min=0, max=1024, initial=1)
+        # self.controlDebugIndex.Bind(wx.EVT_SPINCTRL, self.getOnDebugChange())
+        
         boxSizerDCM = wx.StaticBoxSizer(wx.VERTICAL, self, "Device Communication Module")
         boxSizerDCM.Add(self.controlCommunicationPeriod, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         #DEBUG
         boxSizerDCM.Add(self.buttonTest, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
+        # boxSizerDCM.Add(self.controlDebugIndex, 1, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
         
         self.SetSizer(boxSizerDCM)
         self.Layout()
@@ -325,8 +331,15 @@ class PanelDeviceCommunication(wx.Panel, object):
     def getOnPeriodChange(self):
         def OnPeriodChange(event):
             self.timer_send_period = self.controlCommunicationPeriod.GetValue() / 1000.0
-            pass
+            pub.sendMessage("print_console", message="trest")
+            # print("test")
         return OnPeriodChange
+        
+    # def getOnDebugChange(self):
+        # def OnDebugChange(event):
+            # self.debug_index = self.controlDebugIndex.GetValue()
+            # pub.sendMessage("debug_index", message=self.debug_index)
+        # return OnDebugChange
         
     def serial_send(self):
         # TODO : add check that the port exists and is opened
@@ -334,6 +347,16 @@ class PanelDeviceCommunication(wx.Panel, object):
             pub.sendMessage("serial_tx", message=struct.pack('>cHHchcB', bytes('R', "utf-8"), random.randint(100, 8000), 8000, bytes('S', "utf-8"), random.randint(1, 180), bytes('G', "utf-8"), random.choice([0,1,2,3,4,5,6,7,10])))
  # DEBUG
         else :
+            
+            if self.rpm < 0:
+                self.rpm = 0
+            
+            if self.speed < 0:
+                self.speed = self.speed * (-1)
+            
+            if self.gear < 0:
+                self.gear = 10
+            
             pub.sendMessage("serial_tx", message= struct.pack('>cHHchcB', bytes('R', "utf-8"), self.rpm, self.max_rpm, bytes('S', "utf-8"), self.speed, bytes('G', "utf-8"), self.gear))
         
         with self.thread_lock:
@@ -446,6 +469,9 @@ class PanelLogger(wx.Panel, object):
         pub.subscribe(self.sub_listener, "config_general")
         pub.subscribe(self.sub_listener, "config_logger")
         
+        # DEBUG
+        pub.subscribe(self.sub_listener, "debug")
+        
     def getOnClickStartLogging(self):
         def OnClickStartLogging(event):
             global logger_backend
@@ -520,8 +546,10 @@ class PanelLogger(wx.Panel, object):
         """
         Listener function
         """
-        pass
-
+        # pass
+        self.debug = message
+        print(self.debug)
+        
 
 # ======================================================================================
 class PanelDashboard(wx.Panel, object):
@@ -539,10 +567,11 @@ class PanelDashboard(wx.Panel, object):
         
     # Speedometer
     #############
+        self.speed_max_meter = 200
         self.speedMeter = SM.SpeedMeter(panel1, -1, agwStyle=SM.SM_DRAW_HAND|SM.SM_DRAW_SECTORS|SM.SM_DRAW_MIDDLE_TEXT|SM.SM_DRAW_SECONDARY_TICKS, size = (300,300), mousestyle=0)
 
         self.speedMeter.SetAngleRange(-pi/6, 7*pi/6)
-        intervals = range(0, 201, 20)
+        intervals = range(0, (self.speed_max_meter + 1), int(self.speed_max_meter / 10))
         self.speedMeter.SetIntervals(intervals)
         colours = [wx.BLACK]*10
         self.speedMeter.SetIntervalColours(colours)
@@ -639,7 +668,7 @@ class PanelDashboard(wx.Panel, object):
         pub.subscribe(self.sub_listener_gear, "telemetry_gear")
         pub.subscribe(self.sub_listener_speed, "telemetry_speed")
         pub.subscribe(self.sub_listener_rpm, "telemetry_rpm")
-        pub.subscribe(self.sub_listener_max_rpm, "telemetry_max_rpm")
+        # pub.subscribe(self.sub_listener_max_rpm, "telemetry_max_rpm") # To be adapted if rpm_max data is not available
         
     def RpmMaxUpdate (self, rpm_max):
         """Updates the max RPM value for the meter display by rounding to the immediate thousands up"""
@@ -673,8 +702,8 @@ class PanelDashboard(wx.Panel, object):
             self.gearLed.SetValue(str(int(message)))
         
     def sub_listener_rpm(self, message):
-        if (message < self.rpm_max_meter):
-            self.rpmMeter.SetSpeedValue(message)
+        if (message < self.rpm_max_meter) and (message > 0):
+            self.rpmMeter.SetSpeedValue(int(message))
         else:
             self.rpmMeter.SetSpeedValue(self.rpm_max_meter)
         
@@ -686,7 +715,13 @@ class PanelDashboard(wx.Panel, object):
             pass
         
     def sub_listener_speed(self, message):
-        self.speedMeter.SetSpeedValue(message)
+        if message > 0:
+            if message < self.speed_max_meter:
+                self.speedMeter.SetSpeedValue(int(message))
+            else:
+                self.speedMeter.SetSpeedValue(self.speed_max_meter)
+        else:
+            self.speedMeter.SetSpeedValue(int(message) * (-1))
 
 
 # ======================================================================================
