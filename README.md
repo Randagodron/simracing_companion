@@ -33,7 +33,7 @@ Upper-right : console output.
 
 Lower-left : Logger controls (main menu of dr2_loger).
 
-Lower-right : dash display, shows SPeed, RPMs, gear, track progress, time in seconds. RPM meter automatically scales according to the max_rpm value received from the game.
+Lower-right : dash display, shows Speed, RPMs, gear, track progress, time in seconds. RPM meter automatically scales according to the max_rpm value received from the game.
 
 Architecture
 ------------
@@ -60,7 +60,7 @@ Companion embedded software
 
 Soon ! But this will be released in a separate repository.
 
-I have build a dash screen based on the [STMicroelectronics Discovery STM32F746NG demo board](https://www.st.com/en/evaluation-tools/32f746gdiscovery.html), using [STM32CubeIDE](https://www.st.com/en/development-tools/stm32cubeide.html) for the development of the embedded software, and [TouchGFX](https://www.st.com/en/development-tools/touchgfxdesigner.html) for the development of the GUI. The case is made from laser cut wood from a console2 design in [boxes.py](https://www.festi.info/boxes.py/?language=en).
+I have build a dash screen based on the [STMicroelectronics Discovery STM32F746NG demo board](https://www.st.com/en/evaluation-tools/32f746gdiscovery.html), using [STM32CubeIDE](https://www.st.com/en/development-tools/stm32cubeide.html) for the development of the embedded software, and [TouchGFX](https://www.st.com/en/development-tools/touchgfxdesigner.html) for the development of the GUI. The case is made from laser cut wood. Design is modified version of console2 in [boxes.py](https://www.festi.info/boxes.py/?language=en).
 
 ![External dashboard](/assets/dash_external.jpg)
 

@@ -5,16 +5,15 @@ import configparser
 settings = configparser.ConfigParser()
 
 
-def init_settings():
-    init_settings_input_socket()
-    init_settings_output_socket()
-    init_settings_session_path()
-    init_settings_game('Dirt_Rally_2')
-
 
 def init_settings_input_socket():
     settings['general']['ip_in'] = '127.0.0.1'
     settings['general']['port_in'] = '20777'
+
+
+def init_settings_input_socket(game):
+    settings[game]['ip_in'] = '127.0.0.1'
+    settings[game]['port_in'] = '20777'
 
 
 def init_settings_output_socket():
@@ -32,6 +31,20 @@ def init_settings_game(init_val):
     settings['general']['game'] = init_val
 
 
+def init_settings():
+    init_settings_input_socket()
+    init_settings_output_socket()
+    init_settings_session_path()
+    init_settings_game('Dirt_Rally_2') # Default game is DR2
+
+
+def init_settings(game):
+    init_settings_input_socket(game)
+    init_settings_output_socket()
+    init_settings_session_path()
+    init_settings_game(game)
+
+
 def write_settings():
     with open('settings.ini', 'w') as settings_file:
         settings.write(settings_file)
@@ -41,7 +54,7 @@ def read_settings():
     settings_file_path = 'settings.ini'
     if os.path.isfile(settings_file_path):
         settings.read(settings_file_path)
-    else:
+    else: # If no settings file has been found, create one with default values
         settings['general'] = {}
         init_settings()
         write_settings()

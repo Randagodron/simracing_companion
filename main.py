@@ -25,9 +25,9 @@ import sys
 import threading
 import queue
 
-# For YAML file read
-import yaml
+# For settings file read
 import os.path
+from source import settings
 
 # Misc. imports
 from math import pi, sqrt
@@ -36,6 +36,7 @@ import random
 
 # Dr2_logger classes
 from source.logger_backend import LoggerBackend
+
 
 """
   Code start
@@ -400,6 +401,14 @@ class PanelConsole(wx.Panel, object):
         # Subscribe to general config and console outputs
         pub.subscribe(self.sub_listener, "print_console")
         
+        self.Bind(wx.EVT_CLOSE, self.OnClosePanel)
+        
+        # Overload print to redirect stdout to the console panel
+        """https://stackoverflow.com/questions/550470/overload-print-python"""
+        old_stdout = sys.stdout
+        new_stdout = self
+        sys.stdout = new_stdout
+        
         self.write_length = 0
     
     def write(self, text):
@@ -419,7 +428,13 @@ class PanelConsole(wx.Panel, object):
         
     def flush(self):
         # self.consoleTextCtrl.flush()
-        self.consoleTextCtrl.Remove(self.consoleTextCtrl.GetLastPosition() - self.write_length, self.consoleTextCtrl.GetLastPosition())
+        # self.consoleTextCtrl.Remove(self.consoleTextCtrl.GetLastPosition() - self.write_length, self.consoleTextCtrl.GetLastPosition())
+        pass
+        
+    def OnClosePanel(self, event):
+        # Rollback to standard stdout
+        sys.stdout = old_stdout
+        self.Destroy()
 
 
 # ======================================================================================
@@ -461,6 +476,26 @@ class PanelLogger(wx.Panel, object):
         
         self.SetSizer(boxSizerLogger)
         self.Layout()
+        
+        # Check availability of settings for each game
+        for game in LoggerBackend.get_all_valid_games():
+            if settings.settings.has_section(game):
+                print("Configuration found for ", game)
+                if not settings.settings.has_option(game, 'ip_in'):
+                    print("*** Error *** No 'ip_in' option found for ", game, " -> Loading default values")
+                    settings.init_settings_input_socket(game)
+                
+                if not settings.settings.has_option(game, 'port_in'):
+                    print("*** Error *** No 'port_in' option found for ", game, " -> Loading default values")
+                    settings.init_settings_input_socket(game)
+                
+            else:
+                print("*** Error *** No configuration found for ", game, " -> Loading default values")
+                settings.settings[game] = {}
+                settings.init_settings_input_socket(game)
+            
+            print("Input IP address : ", settings.settings[game]['ip_in'])
+            print("Input port : ", settings.settings[game]['port_in'])
         
         # Start logger thread
         self.thread_udp = threading.Thread(target=udp_listen, daemon=True)
@@ -881,6 +916,7 @@ if __name__ == '__main__':
     # When this module is run (not imported) then create the app, the
     # frame, show it, and start the event loop.
     app = wx.App()
+    
     frm = MainFrame(None, title='DR2 logger WX')
     
     # Set custom icon
@@ -888,32 +924,13 @@ if __name__ == '__main__':
     
     frm.Show()
     
-    # thread_dr2logger_init()
-    
-    # Read configuration file
-    # TODO : load file through File menu
-    # global config
-    
-    # if getattr(sys, 'frozen', None):
-        # approot = os.path.dirname(sys.executable)
-    # else:
-        # approot = os.path.dirname(os.path.realpath(__file__))
-    
-    # try:
-        # config = yaml.load(file(approot + '/config.yml', 'r'))
-    # except yaml.YAMLError as exc:
-        # print ("Error in configuration file:{}", exc)
-    
-    # Overload print to redirect stdout to the console panel
-    """https://stackoverflow.com/questions/550470/overload-print-python"""
-    
-    old_stdout = sys.stdout
-    new_stdout = frm.PanelConsole
-    sys.stdout = new_stdout
-    
-    
+    # # Overload print to redirect stdout to the console panel
+    # """https://stackoverflow.com/questions/550470/overload-print-python"""
+    # old_stdout = sys.stdout
+    # new_stdout = frm.PanelConsole
+    # sys.stdout = new_stdout
     
     app.MainLoop()
     
-    # Rollback to standard stdout
-    sys.stdout = old_stdout
+    # # Rollback to standard stdout
+    # sys.stdout = old_stdout
